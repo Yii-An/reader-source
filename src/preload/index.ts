@@ -23,6 +23,17 @@ const api = {
   executeJs: (url: string, jsCode: string, userAgent?: string) => {
     return ipcRenderer.invoke('proxy:executeJs', { url, jsCode, userAgent })
   },
+  // 在页面上下文中解析（支持原生 XPath）
+  parseInPage: (options: {
+    url: string
+    listRule?: string
+    contentRule?: string
+    fields?: Record<string, string>
+    host?: string
+    userAgent?: string
+  }) => {
+    return ipcRenderer.invoke('proxy:parseInPage', options)
+  },
   // 代理获取图片（绕过防盗链）
   proxyImage: (url: string, referer?: string) => {
     return ipcRenderer.invoke('proxy:image', { url, referer })

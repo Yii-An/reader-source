@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import type { Rule } from '../types'
+import type { UniversalRule } from '../types/universal'
+import { UniversalContentType } from '../types/universal'
 
 defineProps<{
-  sources: Rule[]
+  sources: UniversalRule[]
   currentId: string
   searchQuery: string
 }>()
 
 const emit = defineEmits<{
-  select: [source: Rule]
-  delete: [source: Rule]
+  select: [source: UniversalRule]
+  delete: [source: UniversalRule]
   'update:search-query': [query: string]
 }>()
 </script>
@@ -33,8 +34,8 @@ const emit = defineEmits<{
         @click="emit('select', source)"
       >
         <div class="source-item-icon">
-          <icon-book v-if="source.contentType === 1" />
-          <icon-image v-else-if="source.contentType === 3" />
+          <icon-book v-if="source.contentType === UniversalContentType.NOVEL" />
+          <icon-image v-else-if="source.contentType === UniversalContentType.MANGA" />
           <icon-video-camera v-else />
         </div>
         <div class="source-item-info">
@@ -45,13 +46,11 @@ const emit = defineEmits<{
           <a-button type="text" size="mini"><icon-more /></a-button>
           <template #content>
             <a-doption @click="emit('select', source)">编辑</a-doption>
-            <a-doption @click="emit('delete', source)" class="danger">删除</a-doption>
+            <a-doption class="danger" @click="emit('delete', source)">删除</a-doption>
           </template>
         </a-dropdown>
       </div>
-      <div v-if="sources.length === 0" class="empty-list">
-        暂无书源
-      </div>
+      <div v-if="sources.length === 0" class="empty-list">暂无书源</div>
     </div>
   </div>
 </template>

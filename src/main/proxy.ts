@@ -45,6 +45,15 @@ interface ExecuteJsResponse {
   error?: string
 }
 
+interface ParseInPageRequest {
+  url: string
+  listRule?: string
+  contentRule?: string
+  fields?: Record<string, string>
+  host?: string
+  userAgent?: string
+}
+
 interface CloudflareCheckResult {
   isCloudflare: boolean
   title: string
@@ -204,6 +213,7 @@ async function handleProxy(request: ProxyRequest): Promise<ProxyResponse> {
     // 获取页面内容
     const html = await page.content()
     console.log('Got HTML content, length:', html.length)
+    console.log('HTML content:', html)
     console.log('Final page title:', await page.title())
     console.log('='.repeat(50))
 
@@ -217,6 +227,66 @@ async function handleProxy(request: ProxyRequest): Promise<ProxyResponse> {
       await page.close().catch(() => {})
     }
   }
+}
+
+/**
+ * 检测是否为 XPath 规则
+ */
+function isXPathRule(rule: string): boolean {
+  return rule.startsWith('//') || rule.startsWith('/')
+}
+
+/**
+ * 将 XPath 规则转换为 CSS 选择器
+ * 支持常见的 XPath 语法：
+ * - //*[@class="xxx"] -> .xxx
+ * - //div[@class="xxx"] -> div.xxx
+ * - //div/section/ul/li -> div section ul li
+ * - li[position()>1] -> li:nth-child(n+2)
+ * - li[last()] -> li:last-child
+ * - li[1] -> li:nth-child(1)
+ */
+function xpathToCssSelector(xpath: string): string {
+  console.log('[XPath] Converting:', xpath)
+
+  let css = xpath
+    // 移除开头的 // 或 /
+    .replace(/^\/\/\*/, '*')
+    .replace(/^\/\//, '')
+    .replace(/^\//, '')
+
+  // 处理 [@class="xxx"] -> .xxx
+  css = css.replace(/\[@class="([^"]+)"\]/g, '.$1')
+  css = css.replace(/\[@class='([^']+)'\]/g, '.$1')
+
+  // 处理 [@id="xxx"] -> #xxx
+  css = css.replace(/\[@id="([^"]+)"\]/g, '#$1')
+  css = css.replace(/\[@id='([^']+)'\]/g, '#$1')
+
+  // 处理 [@attr="value"] -> [attr="value"]
+  css = css.replace(/\[@([^=\]]+)="([^"]+)"\]/g, '[$1="$2"]')
+  css = css.replace(/\[@([^=\]]+)='([^']+)'\]/g, "[$1='$2']")
+
+  // 处理 [position()>n] -> :nth-child(n+N+1)
+  css = css.replace(/\[position\(\)>(\d+)\]/g, (_, n) => `:nth-child(n+${parseInt(n) + 1})`)
+  css = css.replace(/\[position\(\)>=(\d+)\]/g, (_, n) => `:nth-child(n+${parseInt(n)})`)
+  css = css.replace(/\[position\(\)<(\d+)\]/g, (_, n) => `:nth-child(-n+${parseInt(n) - 1})`)
+  css = css.replace(/\[position\(\)<=(\d+)\]/g, (_, n) => `:nth-child(-n+${parseInt(n)})`)
+
+  // 处理 [last()] -> :last-child
+  css = css.replace(/\[last\(\)\]/g, ':last-child')
+
+  // 处理 [n] (索引) -> :nth-child(n)
+  css = css.replace(/\[(\d+)\]/g, ':nth-child($1)')
+
+  // 将 / 转换为空格（子元素选择器）
+  css = css.replace(/\//g, ' ')
+
+  // 清理多余空格
+  css = css.replace(/\s+/g, ' ').trim()
+
+  console.log('[XPath] Converted to CSS:', css)
+  return css
 }
 
 /**
@@ -234,17 +304,39 @@ function handleParse(request: ParseRequest): ParseResponse {
 
     if (contentRule) {
       const content: string[] = []
-      const selector = contentRule.replace(/@.*$/, '').trim()
+      // 对于 XPath 规则，不移除 @ 字符（因为 [@class=...] 是有效语法）
+      // 对于 CSS 规则，移除末尾的 @attr 部分
+      let selector = contentRule.trim()
+      if (isXPathRule(selector)) {
+        console.log('[Parse] Content rule (XPath):', selector)
+        selector = xpathToCssSelector(selector)
+      } else {
+        // CSS 规则：移除末尾的 @attr 部分
+        selector = selector.replace(/@[^@[\]]*$/, '').trim()
+        console.log('[Parse] Content rule (CSS):', selector)
+      }
       $(selector).each((_, el) => {
         const text = $(el).text().trim()
         if (text) content.push(text)
       })
+      console.log('[Parse] Found content items:', content.length)
       return { success: true, data: content }
     }
 
     if (listRule && fields) {
       const results: Record<string, unknown>[] = []
-      const selector = listRule.replace(/@.*$/, '').trim()
+      // 对于 XPath 规则，不移除 @ 字符
+      let selector = listRule.trim()
+      if (isXPathRule(selector)) {
+        console.log('[Parse] List rule (XPath):', selector)
+        selector = xpathToCssSelector(selector)
+      } else {
+        // CSS 规则：移除末尾的 @attr 部分
+        selector = selector.replace(/@[^@[\]]*$/, '').trim()
+        console.log('[Parse] List rule (CSS):', selector)
+      }
+      console.log('[Parse] Final selector:', selector)
+      console.log('[Parse] Fields:', JSON.stringify(fields))
 
       $(selector).each((_, element) => {
         const item: Record<string, unknown> = {}
@@ -260,12 +352,17 @@ function handleParse(request: ParseRequest): ParseResponse {
         }
       })
 
+      console.log('[Parse] Found items:', results.length)
+      if (results.length > 0) {
+        console.log('[Parse] First item sample:', JSON.stringify(results[0]))
+      }
       return { success: true, data: results }
     }
 
     return { success: false, error: 'Invalid parse request' }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
+    console.error('[Parse] Error:', message)
     return { success: false, error: message }
   }
 }
@@ -460,6 +557,280 @@ async function handleExecuteJs(request: ExecuteJsRequest): Promise<ExecuteJsResp
 }
 
 /**
+ * 在页面上下文中解析内容（支持原生 XPath）
+ * 使用 Puppeteer 打开页面，然后在浏览器中执行 document.evaluate() 进行 XPath 查询
+ */
+async function handleParseInPage(request: ParseInPageRequest): Promise<ParseResponse> {
+  const { url, listRule, contentRule, fields, host, userAgent } = request
+
+  if (!url) {
+    return { success: false, error: 'URL is required' }
+  }
+
+  let page: Page | null = null
+
+  try {
+    console.log('='.repeat(50))
+    console.log('[ParseInPage] URL:', url)
+    console.log('[ParseInPage] listRule:', listRule)
+    console.log('[ParseInPage] contentRule:', contentRule)
+    console.log('[ParseInPage] fields:', JSON.stringify(fields))
+
+    const browserInstance = await getBrowser()
+    page = await browserInstance.newPage()
+
+    // 设置 User-Agent
+    await page.setUserAgent(
+      userAgent ||
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    )
+
+    // 设置视口
+    await page.setViewport({ width: 1920, height: 1080 })
+
+    // 设置额外的 HTTP 头
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+    })
+
+    // 设置超时
+    page.setDefaultTimeout(60000)
+
+    // 导航到页面
+    console.log('[ParseInPage] Navigating to page...')
+    const response = await page.goto(url, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    })
+
+    if (!response) {
+      return { success: false, error: '页面加载失败' }
+    }
+
+    console.log('[ParseInPage] Response status:', response.status())
+
+    // Cloudflare 检测与等待
+    let retryCount = 0
+    let cfCheck = await checkCloudflare(page)
+
+    while (cfCheck.isCloudflare && retryCount < CLOUDFLARE_MAX_RETRIES) {
+      retryCount++
+      console.log(
+        `[Cloudflare] 检测到验证页面，等待 ${CLOUDFLARE_WAIT_TIME / 1000} 秒... (第 ${retryCount}/${CLOUDFLARE_MAX_RETRIES} 次)`
+      )
+      await new Promise((resolve) => setTimeout(resolve, CLOUDFLARE_WAIT_TIME))
+      try {
+        await page
+          .waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 3000 })
+          .catch(() => {})
+        await page.waitForNetworkIdle({ timeout: 5000 }).catch(() => {})
+      } catch {
+        // 忽略超时错误
+      }
+      cfCheck = await checkCloudflare(page)
+    }
+
+    if (cfCheck.isCloudflare) {
+      return { success: false, error: 'Cloudflare 验证未通过，请稍后重试' }
+    }
+
+    // 等待页面内容加载
+    await page.waitForSelector('body', { timeout: 5000 }).catch(() => {})
+
+    // 在页面上下文中执行解析
+    const parseParams = {
+      listRule: listRule || '',
+      contentRule: contentRule || '',
+      fields: fields || {},
+      host: host || ''
+    }
+
+    const results = await page.evaluate((params) => {
+      // 辅助函数：检测是否为 XPath
+      function isXPath(rule: string): boolean {
+        return rule.startsWith('//') || rule.startsWith('/')
+      }
+
+      // 辅助函数：通过 XPath 获取元素
+      function getElementsByXPath(xpath: string, context: Node = document): Element[] {
+        const result = document.evaluate(
+          xpath,
+          context,
+          null,
+          XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+          null
+        )
+        const elements: Element[] = []
+        for (let i = 0; i < result.snapshotLength; i++) {
+          const node = result.snapshotItem(i)
+          if (node && node.nodeType === Node.ELEMENT_NODE) {
+            elements.push(node as Element)
+          }
+        }
+        return elements
+      }
+
+      // 辅助函数：通过 CSS 选择器获取元素
+      function getElementsByCSS(
+        selector: string,
+        context: Element | Document = document
+      ): Element[] {
+        try {
+          return Array.from(context.querySelectorAll(selector))
+        } catch {
+          return []
+        }
+      }
+
+      // 辅助函数：从规则中提取值
+      function extractValue(element: Element, rule: string, host: string): string {
+        if (!rule) return ''
+
+        // 解析规则：selector@attr 或 @attr
+        const atIndex = rule.lastIndexOf('@')
+        let selector = ''
+        let attr = 'text'
+
+        if (rule.startsWith('@')) {
+          attr = rule.slice(1)
+        } else if (atIndex > 0) {
+          selector = rule.substring(0, atIndex).trim()
+          attr = rule.substring(atIndex + 1).trim()
+        } else {
+          selector = rule
+        }
+
+        // 查找目标元素
+        let target: Element | null = element
+        if (selector) {
+          if (isXPath(selector)) {
+            // 相对 XPath 查询
+            const relativeXPath = selector.startsWith('.') ? selector : '.' + selector
+            const found = getElementsByXPath(relativeXPath, element)
+            target = found.length > 0 ? found[0] : null
+          } else {
+            target = element.querySelector(selector)
+          }
+        }
+
+        if (!target) return ''
+
+        // 提取属性值
+        let value = ''
+        switch (attr) {
+          case 'text':
+            value = (target.textContent || '').trim()
+            break
+          case 'html':
+            value = target.innerHTML || ''
+            break
+          case 'href':
+            value = target.getAttribute('href') || ''
+            break
+          case 'src':
+            value = target.getAttribute('src') || ''
+            break
+          default:
+            value = target.getAttribute(attr) || (target.textContent || '').trim()
+        }
+
+        // 处理相对 URL
+        if ((attr === 'href' || attr === 'src') && value && host && !value.startsWith('http')) {
+          const baseHost = host.endsWith('/') ? host.slice(0, -1) : host
+          value = value.startsWith('/') ? baseHost + value : baseHost + '/' + value
+        }
+
+        return value
+      }
+
+      // 主逻辑
+      try {
+        // 处理正文规则
+        if (params.contentRule) {
+          const rule = params.contentRule.trim()
+          const content: string[] = []
+          let elements: Element[] = []
+
+          if (isXPath(rule)) {
+            console.log('[ParseInPage] Using XPath for content:', rule)
+            elements = getElementsByXPath(rule)
+          } else {
+            // CSS 规则可能包含 @attr，需要移除
+            const selector = rule.replace(/@[^@[\]]*$/, '').trim()
+            console.log('[ParseInPage] Using CSS for content:', selector)
+            elements = getElementsByCSS(selector)
+          }
+
+          for (const el of elements) {
+            const text = (el.textContent || '').trim()
+            if (text) content.push(text)
+          }
+
+          return { success: true, data: content, type: 'content', count: content.length }
+        }
+
+        // 处理列表规则
+        if (params.listRule) {
+          const rule = params.listRule.trim()
+          const items: Record<string, unknown>[] = []
+          let elements: Element[] = []
+
+          if (isXPath(rule)) {
+            console.log('[ParseInPage] Using XPath for list:', rule)
+            elements = getElementsByXPath(rule)
+          } else {
+            // CSS 规则可能包含 @attr，需要移除
+            const selector = rule.replace(/@[^@[\]]*$/, '').trim()
+            console.log('[ParseInPage] Using CSS for list:', selector)
+            elements = getElementsByCSS(selector)
+          }
+
+          console.log('[ParseInPage] Found elements:', elements.length)
+
+          for (const el of elements) {
+            const item: Record<string, unknown> = {}
+
+            for (const [key, fieldRule] of Object.entries(params.fields)) {
+              if (!fieldRule) continue
+              item[key] = extractValue(el, fieldRule as string, params.host)
+            }
+
+            if (item.name || item.url) {
+              items.push(item)
+            }
+          }
+
+          return { success: true, data: items, type: 'list', count: items.length }
+        }
+
+        return { success: false, error: 'No rule provided' }
+      } catch (e) {
+        const err = e as Error
+        return { success: false, error: err.message }
+      }
+    }, parseParams)
+
+    console.log('[ParseInPage] Parse result:', JSON.stringify(results).substring(0, 500))
+    console.log('='.repeat(50))
+
+    if (!results.success) {
+      return { success: false, error: results.error || '解析失败' }
+    }
+
+    return { success: true, data: results.data as unknown[] }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[ParseInPage] Error:', message)
+    return { success: false, error: message }
+  } finally {
+    if (page) {
+      await page.close().catch(() => {})
+    }
+  }
+}
+
+/**
  * 代理获取图片（绕过防盗链）
  */
 async function handleProxyImage(request: {
@@ -513,6 +884,10 @@ export function registerProxyHandlers(): void {
 
   ipcMain.handle('proxy:parse', (_, request: ParseRequest) => {
     return handleParse(request)
+  })
+
+  ipcMain.handle('proxy:parseInPage', async (_, request: ParseInPageRequest) => {
+    return handleParseInPage(request)
   })
 
   ipcMain.handle('proxy:executeJs', async (_, request: ExecuteJsRequest) => {

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { Rule } from '../types'
-import { ContentType } from '../types'
+import type { UniversalRule } from '../types/universal'
+import { UniversalContentType } from '../types/universal'
 import { useLogStore } from '../stores/logStore'
 
 const props = defineProps<{
-  rule: Rule
+  rule: UniversalRule
 }>()
 
 const logStore = useLogStore()
@@ -36,8 +36,13 @@ const categoriesLoading = ref(false)
 const contentUrl = ref('')
 const contentData = ref<string[]>([])
 
+// 结果展示 Tab
+const resultTab = ref<'visual' | 'parsed' | 'raw'>('visual')
+const rawHtml = ref('') // 原始 HTML 源码
+const parsedResult = ref<unknown[]>([]) // 解析结果 JSON
+
 // 检测是否为漫画类型（需要显示图片）
-const isMangaContent = computed(() => props.rule.contentType === ContentType.MANGA)
+const isMangaContent = computed(() => props.rule.contentType === UniversalContentType.MANGA)
 
 // 监听 rule 变化，清空所有预览数据
 watch(
@@ -53,6 +58,9 @@ watch(
     chapterResults.value = []
     contentUrl.value = ''
     contentData.value = []
+    rawHtml.value = ''
+    parsedResult.value = []
+    resultTab.value = 'visual'
     logStore.debug('切换书源，已清空预览数据')
   }
 )
@@ -84,12 +92,12 @@ async function runTest(): Promise<void> {
 }
 
 async function runSearchTest(): Promise<void> {
-  if (!searchKeyword.value || !props.rule.searchUrl) {
+  if (!searchKeyword.value || !props.rule.search?.url) {
     logStore.error('请输入搜索关键词并配置搜索URL')
     return
   }
 
-  const searchUrl = props.rule.searchUrl
+  const searchUrl = props.rule.search.url
     .replace(/\$keyword|\{\{keyword\}\}/g, encodeURIComponent(searchKeyword.value))
     .replace(/\$page|\{\{page\}\}/g, '1')
 
@@ -102,28 +110,41 @@ async function runSearchTest(): Promise<void> {
   }
 
   logStore.debug(`获取到 HTML，长度: ${proxyResult.html?.length}`)
+  // 保存原始 HTML
+  rawHtml.value = proxyResult.html || ''
+
+  // 输出规则日志
+  logStore.debug(`[规则] searchList: ${props.rule.search.list || '(未设置)'}`)
+  logStore.debug(`[规则] searchName: ${props.rule.search.name || '@text'}`)
+  logStore.debug(`[规则] searchAuthor: ${props.rule.search.author || '(未设置)'}`)
+  logStore.debug(`[规则] searchResult: ${props.rule.search.result || 'a@href'}`)
 
   const parseResult = await window.api.parse(proxyResult.html!, {
-    listRule: props.rule.searchList,
+    listRule: props.rule.search.list,
     fields: {
-      name: props.rule.searchName || '@text',
-      cover: props.rule.searchCover,
-      author: props.rule.searchAuthor,
-      url: props.rule.searchResult || 'a@href'
+      name: props.rule.search.name || '@text',
+      cover: props.rule.search.cover,
+      author: props.rule.search.author,
+      url: props.rule.search.result || 'a@href'
     },
     host: props.rule.host
   })
 
   if (parseResult.success) {
     searchResults.value = parseResult.data || []
+    // 保存解析结果
+    parsedResult.value = parseResult.data || []
     logStore.info(`找到 ${searchResults.value.length} 个结果`)
+    if (searchResults.value.length > 0) {
+      logStore.debug(`[结果示例] ${JSON.stringify(searchResults.value[0])}`)
+    }
   } else {
     throw new Error(parseResult.error || '解析失败')
   }
 }
 
 async function runDiscoverTest(): Promise<void> {
-  if (!props.rule.discoverUrl) {
+  if (!props.rule.discover?.url) {
     logStore.error('请配置发现URL')
     return
   }
@@ -150,37 +171,74 @@ async function runDiscoverTest(): Promise<void> {
   const fullUrl = buildFullUrl(discoverUrl, props.rule.host)
   logStore.debug(`请求 URL: ${fullUrl}`)
 
-  const proxyResult = await window.api.proxy(fullUrl, props.rule.userAgent)
-  if (!proxyResult.success) {
-    throw new Error(proxyResult.error || '代理请求失败')
+  // 输出规则日志
+  const listRule = props.rule.discover.list || ''
+  logStore.debug(`[规则] discoverList: ${listRule || '(未设置)'}`)
+  logStore.debug(`[规则] discoverName: ${props.rule.discover.name || '@text'}`)
+  logStore.debug(`[规则] discoverAuthor: ${props.rule.discover.author || '(未设置)'}`)
+  logStore.debug(`[规则] discoverResult: ${props.rule.discover.result || 'a@href'}`)
+
+  // 检测是否为 XPath 规则
+  const isXPath = listRule.startsWith('//') || listRule.startsWith('/')
+
+  let parseResult
+  if (isXPath) {
+    logStore.debug('[XPath] 检测到 XPath 规则，使用原生 document.evaluate()')
+    // XPath 模式：rawHtml 在服务端获取，这里只能显示提示
+    rawHtml.value = '(XPath 模式下原始 HTML 在服务端处理)'
+    // 使用 parseInPage API（原生 XPath 支持）
+    parseResult = await window.api.parseInPage({
+      url: fullUrl,
+      listRule: listRule,
+      fields: {
+        name: props.rule.discover.name || '@text',
+        cover: props.rule.discover.cover,
+        author: props.rule.discover.author,
+        url: props.rule.discover.result || 'a@href'
+      },
+      host: props.rule.host,
+      userAgent: props.rule.userAgent
+    })
+  } else {
+    // CSS 选择器：使用 proxy + parse
+    const proxyResult = await window.api.proxy(fullUrl, props.rule.userAgent)
+    if (!proxyResult.success) {
+      throw new Error(proxyResult.error || '代理请求失败')
+    }
+    logStore.debug(`获取到 HTML，长度: ${proxyResult.html?.length}`)
+    // 保存原始 HTML
+    rawHtml.value = proxyResult.html || ''
+
+    parseResult = await window.api.parse(proxyResult.html!, {
+      listRule: listRule,
+      fields: {
+        name: props.rule.discover.name || '@text',
+        cover: props.rule.discover.cover,
+        author: props.rule.discover.author,
+        url: props.rule.discover.result || 'a@href'
+      },
+      host: props.rule.host
+    })
   }
-
-  logStore.debug(`获取到 HTML，长度: ${proxyResult.html?.length}`)
-
-  const parseResult = await window.api.parse(proxyResult.html!, {
-    listRule: props.rule.discoverList,
-    fields: {
-      name: props.rule.discoverName || '@text',
-      cover: props.rule.discoverCover,
-      author: props.rule.discoverAuthor,
-      url: props.rule.discoverResult || 'a@href'
-    },
-    host: props.rule.host
-  })
 
   if (parseResult.success) {
     discoverResults.value = parseResult.data || []
+    // 保存解析结果
+    parsedResult.value = parseResult.data || []
     logStore.info(`发现 ${discoverResults.value.length} 个结果`)
+    if (discoverResults.value.length > 0) {
+      logStore.debug(`[结果示例] ${JSON.stringify(discoverResults.value[0])}`)
+    }
   } else {
     throw new Error(parseResult.error || '解析失败')
   }
 }
 
 async function loadDiscoverCategories(): Promise<void> {
-  if (!props.rule.discoverUrl) return
+  if (!props.rule.discover?.url) return
 
   categoriesLoading.value = true
-  const discoverUrlRaw = props.rule.discoverUrl.trim()
+  const discoverUrlRaw = props.rule.discover.url.trim()
 
   try {
     let rawList: string[] = []
@@ -286,23 +344,45 @@ async function fetchDiscoverData(): Promise<void> {
   const fullUrl = buildFullUrl(discoverUrl, props.rule.host)
   logStore.debug(`请求 URL: ${fullUrl}`)
 
+  const listRule = props.rule.discover?.list || ''
+  const isXPath = listRule.startsWith('//') || listRule.startsWith('/')
+
   testing.value = true
   try {
-    const proxyResult = await window.api.proxy(fullUrl, props.rule.userAgent)
-    if (!proxyResult.success) {
-      throw new Error(proxyResult.error || '代理请求失败')
-    }
+    let parseResult
 
-    const parseResult = await window.api.parse(proxyResult.html!, {
-      listRule: props.rule.discoverList,
-      fields: {
-        name: props.rule.discoverName || '@text',
-        cover: props.rule.discoverCover,
-        author: props.rule.discoverAuthor,
-        url: props.rule.discoverResult || 'a@href'
-      },
-      host: props.rule.host
-    })
+    if (isXPath) {
+      // 使用 parseInPage API（原生 XPath 支持）
+      parseResult = await window.api.parseInPage({
+        url: fullUrl,
+        listRule: listRule,
+        fields: {
+          name: props.rule.discover?.name || '@text',
+          cover: props.rule.discover?.cover,
+          author: props.rule.discover?.author,
+          url: props.rule.discover?.result || 'a@href'
+        },
+        host: props.rule.host,
+        userAgent: props.rule.userAgent
+      })
+    } else {
+      // CSS 选择器：使用 proxy + parse
+      const proxyResult = await window.api.proxy(fullUrl, props.rule.userAgent)
+      if (!proxyResult.success) {
+        throw new Error(proxyResult.error || '代理请求失败')
+      }
+
+      parseResult = await window.api.parse(proxyResult.html!, {
+        listRule: listRule,
+        fields: {
+          name: props.rule.discover?.name || '@text',
+          cover: props.rule.discover?.cover,
+          author: props.rule.discover?.author,
+          url: props.rule.discover?.result || 'a@href'
+        },
+        host: props.rule.host
+      })
+    }
 
     if (parseResult.success) {
       discoverResults.value = parseResult.data || []
@@ -324,8 +404,8 @@ async function runChapterTest(): Promise<void> {
     return
   }
 
-  const chapterUrlFinal = props.rule.chapterUrl
-    ? props.rule.chapterUrl.replace(/\$result|\{\{result\}\}/g, chapterUrl.value)
+  const chapterUrlFinal = props.rule.chapter?.url
+    ? props.rule.chapter.url.replace(/\$result|\{\{result\}\}/g, chapterUrl.value)
     : chapterUrl.value
 
   const fullUrl = buildFullUrl(chapterUrlFinal, props.rule.host)
@@ -337,10 +417,10 @@ async function runChapterTest(): Promise<void> {
   }
 
   const parseResult = await window.api.parse(proxyResult.html!, {
-    listRule: props.rule.chapterList,
+    listRule: props.rule.chapter?.list,
     fields: {
-      name: props.rule.chapterName || '@text',
-      url: props.rule.chapterResult || 'a@href'
+      name: props.rule.chapter?.name || '@text',
+      url: props.rule.chapter?.result || 'a@href'
     },
     host: props.rule.host
   })
@@ -359,14 +439,14 @@ async function runContentTest(): Promise<void> {
     return
   }
 
-  const contentUrlFinal = props.rule.contentUrl
-    ? props.rule.contentUrl.replace(/\$result|\{\{result\}\}/g, contentUrl.value)
+  const contentUrlFinal = props.rule.content?.url
+    ? props.rule.content.url.replace(/\$result|\{\{result\}\}/g, contentUrl.value)
     : contentUrl.value
 
   const fullUrl = buildFullUrl(contentUrlFinal, props.rule.host)
   logStore.debug(`请求 URL: ${fullUrl}`)
 
-  const contentRule = props.rule.contentItems || ''
+  const contentRule = props.rule.content?.items || ''
 
   // 检测是否为 JavaScript 规则（包含函数定义、变量赋值等 JS 语法）
   const isJsRule =
@@ -499,21 +579,6 @@ function selectResult(item: { name: string; url: string }): void {
         >
           <template #button-default>测试</template>
         </a-input-search>
-        <!-- 搜索结果 -->
-        <div v-if="searchResults.length > 0" class="result-list">
-          <div
-            v-for="(item, index) in searchResults"
-            :key="index"
-            class="result-item"
-            @click="selectResult(item)"
-          >
-            <div class="result-info">
-              <div class="result-name">{{ item.name }}</div>
-              <div class="result-url">{{ item.author || item.url }}</div>
-            </div>
-            <icon-right class="result-arrow" />
-          </div>
-        </div>
       </div>
 
       <!-- 发现页 -->
@@ -555,21 +620,6 @@ function selectResult(item: { name: string; url: string }): void {
           <icon-thunderbolt />
           {{ discoverGroups.length > 0 ? '刷新列表' : '加载分类' }}
         </a-button>
-        <!-- 发现结果 -->
-        <div v-if="discoverResults.length > 0" class="result-list">
-          <div
-            v-for="(item, index) in discoverResults"
-            :key="index"
-            class="result-item"
-            @click="selectResult(item)"
-          >
-            <div class="result-info">
-              <div class="result-name">{{ item.name }}</div>
-              <div class="result-url">{{ item.author || item.url }}</div>
-            </div>
-            <icon-right class="result-arrow" />
-          </div>
-        </div>
       </div>
 
       <!-- 章节输入 -->
@@ -578,21 +628,6 @@ function selectResult(item: { name: string; url: string }): void {
         <a-button type="primary" size="small" :loading="testing" @click="runTest">
           <icon-thunderbolt /> 执行测试
         </a-button>
-        <!-- 章节结果 -->
-        <div v-if="chapterResults.length > 0" class="result-list">
-          <div
-            v-for="(item, index) in chapterResults"
-            :key="index"
-            class="result-item"
-            @click="selectResult(item)"
-          >
-            <div class="result-info">
-              <div class="result-name">{{ item.name }}</div>
-              <div class="result-url">{{ item.url }}</div>
-            </div>
-            <icon-right class="result-arrow" />
-          </div>
-        </div>
       </div>
 
       <!-- 正文输入 -->
@@ -601,26 +636,97 @@ function selectResult(item: { name: string; url: string }): void {
         <a-button type="primary" size="small" :loading="testing" @click="runTest">
           <icon-thunderbolt /> 执行测试
         </a-button>
-        <!-- 正文内容 -->
-        <div v-if="contentData.length > 0" class="content-preview">
-          <!-- 漫画模式显示图片 -->
-          <template v-if="isMangaContent">
-            <div class="manga-images">
-              <template v-for="(imgUrl, index) in contentData" :key="index">
-                <a-image
-                  :src="imgUrl"
-                  width="100%"
-                  :alt="`第 ${index + 1} 页`"
-                  class="manga-page"
-                />
+      </div>
+
+      <!-- 结果展示区域（有数据时显示） -->
+      <div
+        v-if="
+          searchResults.length > 0 ||
+          discoverResults.length > 0 ||
+          chapterResults.length > 0 ||
+          contentData.length > 0 ||
+          rawHtml
+        "
+        class="result-display-tabs"
+      >
+        <a-tabs v-model:active-key="resultTab" size="small" type="rounded">
+          <a-tab-pane key="visual" title="可视化">
+            <!-- 搜索结果列表 -->
+            <div v-if="testType === 'search' && searchResults.length > 0" class="result-list">
+              <div
+                v-for="(item, index) in searchResults"
+                :key="index"
+                class="result-item"
+                @click="selectResult(item)"
+              >
+                <div class="result-info">
+                  <div class="result-name">{{ item.name }}</div>
+                  <div class="result-url">{{ item.author || item.url }}</div>
+                </div>
+                <icon-right class="result-arrow" />
+              </div>
+            </div>
+            <!-- 发现结果列表 -->
+            <div v-else-if="testType === 'discover' && discoverResults.length > 0" class="result-list">
+              <div
+                v-for="(item, index) in discoverResults"
+                :key="index"
+                class="result-item"
+                @click="selectResult(item)"
+              >
+                <div class="result-info">
+                  <div class="result-name">{{ item.name }}</div>
+                  <div class="result-url">{{ item.author || item.url }}</div>
+                </div>
+                <icon-right class="result-arrow" />
+              </div>
+            </div>
+            <!-- 章节结果列表 -->
+            <div v-else-if="testType === 'chapter' && chapterResults.length > 0" class="result-list">
+              <div
+                v-for="(item, index) in chapterResults"
+                :key="index"
+                class="result-item"
+                @click="selectResult(item)"
+              >
+                <div class="result-info">
+                  <div class="result-name">{{ item.name }}</div>
+                  <div class="result-url">{{ item.url }}</div>
+                </div>
+                <icon-right class="result-arrow" />
+              </div>
+            </div>
+            <!-- 正文内容 -->
+            <div v-else-if="testType === 'content' && contentData.length > 0" class="content-preview">
+              <template v-if="isMangaContent">
+                <div class="manga-images">
+                  <template v-for="(imgUrl, index) in contentData" :key="index">
+                    <a-image
+                      :src="imgUrl"
+                      width="100%"
+                      :alt="`第 ${index + 1} 页`"
+                      class="manga-page"
+                    />
+                  </template>
+                </div>
+              </template>
+              <template v-else>
+                <p v-for="(para, index) in contentData" :key="index">{{ para }}</p>
               </template>
             </div>
-          </template>
-          <!-- 小说模式显示文本 -->
-          <template v-else>
-            <p v-for="(para, index) in contentData" :key="index">{{ para }}</p>
-          </template>
-        </div>
+            <a-empty v-else description="暂无可视化结果" />
+          </a-tab-pane>
+          <a-tab-pane key="parsed" title="解析结果">
+            <div class="parsed-result">
+              <pre>{{ JSON.stringify(parsedResult, null, 2) }}</pre>
+            </div>
+          </a-tab-pane>
+          <a-tab-pane key="raw" title="原始数据">
+            <div class="raw-html">
+              <pre>{{ rawHtml }}</pre>
+            </div>
+          </a-tab-pane>
+        </a-tabs>
       </div>
 
       <a-empty
@@ -629,7 +735,8 @@ function selectResult(item: { name: string; url: string }): void {
           searchResults.length === 0 &&
           discoverResults.length === 0 &&
           chapterResults.length === 0 &&
-          contentData.length === 0
+          contentData.length === 0 &&
+          !rawHtml
         "
         description="暂无结果"
       />
@@ -746,5 +853,37 @@ function selectResult(item: { name: string; url: string }): void {
   height: auto;
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 结果展示 Tab 样式 */
+.result-display-tabs {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.tab-content-hint {
+  text-align: center;
+  color: var(--color-text-3);
+  padding: 16px;
+}
+
+.parsed-result,
+.raw-html {
+  max-height: 400px;
+  overflow: auto;
+  background: var(--color-bg-2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.parsed-result pre,
+.raw-html pre {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: 'Consolas', 'Monaco', monospace;
 }
 </style>

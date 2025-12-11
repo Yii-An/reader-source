@@ -36,6 +36,14 @@ interface API {
       host?: string
     }
   ) => Promise<ParseResult>
+  parseInPage: (options: {
+    url: string
+    listRule?: string
+    contentRule?: string
+    fields?: Record<string, string>
+    host?: string
+    userAgent?: string
+  }) => Promise<ParseResult>
   executeJs: (url: string, jsCode: string, userAgent?: string) => Promise<ExecuteJsResult>
   proxyImage: (url: string, referer?: string) => Promise<ProxyImageResult>
 }

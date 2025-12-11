@@ -3,6 +3,14 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerProxyHandlers, closeBrowser } from './proxy'
+import { redirectConsoleToLogger, getLogFilePath } from './logger'
+
+// 启用日志文件记录
+redirectConsoleToLogger()
+console.log('========================================')
+console.log('Application starting...')
+console.log('Log file:', getLogFilePath())
+console.log('========================================')
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
