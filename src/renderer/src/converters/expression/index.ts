@@ -6,6 +6,7 @@
 export {
   parseExpression,
   stringifyExpression,
+  stringifyLogicalExpression,
   createCssExpression,
   createXPathExpression,
   createJsonExpression,
@@ -25,6 +26,7 @@ export {
 
 // 变量转换
 export {
+  VariableConverter,
   convertAnyReaderVariables,
   convertToAnyReaderVariables,
   convertLegadoVariables,
@@ -36,10 +38,26 @@ export {
   normalizeAnyReaderExpression,
   normalizeLegadoExpression,
   denormalizeToAnyReader,
-  denormalizeToLegado
+  denormalizeToLegado,
+  parseContextVariable,
+  resolveContextVariable,
+  replaceVariables,
+  extractAllVariableNames
 } from './variables'
 
-import { normalizeExpression, detectExpressionType } from '../../types/expression'
+// 验证器
+export {
+  ExpressionValidator,
+  type ValidationError,
+  type ValidationWarning,
+  type ExpressionValidationResult
+} from './validator'
+
+import {
+  normalizeExpression,
+  detectExpressionType,
+  type ExpressionType
+} from '../../types/expression'
 import { convertJsoupDefault, isJsoupDefaultSyntax } from './jsoup'
 import {
   normalizeAnyReaderExpression,
@@ -124,7 +142,7 @@ export class ExpressionConverter {
   /**
    * 检测表达式类型
    */
-  static detectType(expr: string) {
+  static detectType(expr: string): ExpressionType {
     return detectExpressionType(expr)
   }
 

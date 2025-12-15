@@ -7,7 +7,9 @@ import type {
   UniversalExpression,
   ExpressionType,
   PostProcessConfig,
-  ReplaceConfig
+  ReplaceConfig,
+  LogicalOperator,
+  LogicalExpressionNode
 } from '../../types/expression'
 import { detectExpressionType, EXPRESSION_PREFIXES } from '../../types/expression'
 
@@ -49,20 +51,132 @@ export function parseExpression(expr: string): ParseResult {
 }
 
 /**
+ * 分割逻辑运算符
+ * 注意：需要处理嵌套括号和字符串内的运算符
+ */
+function splitByLogicalOperators(expr: string): {
+  parts: string[]
+  operators: LogicalOperator[]
+} {
+  const parts: string[] = []
+  const operators: LogicalOperator[] = []
+  let current = ''
+  let depth = 0 // 括号深度
+  let inString = false
+  let stringChar = ''
+
+  for (let i = 0; i < expr.length; i++) {
+    const char = expr[i]
+    const nextChar = expr[i + 1]
+    const prevChar = expr[i - 1]
+
+    // 处理字符串
+    if ((char === '"' || char === "'") && prevChar !== '\\') {
+      if (!inString) {
+        inString = true
+        stringChar = char
+      } else if (char === stringChar) {
+        inString = false
+      }
+    }
+
+    // 处理括号深度
+    if (!inString) {
+      if (char === '(' || char === '[' || char === '{') depth++
+      if (char === ')' || char === ']' || char === '}') depth--
+    }
+
+    // 检测逻辑运算符（仅在顶层）
+    if (!inString && depth === 0) {
+      if (char === '|' && nextChar === '|') {
+        parts.push(current.trim())
+        operators.push('||')
+        current = ''
+        i++ // 跳过下一个字符
+        continue
+      }
+      if (char === '&' && nextChar === '&') {
+        parts.push(current.trim())
+        operators.push('&&')
+        current = ''
+        i++
+        continue
+      }
+    }
+
+    current += char
+  }
+
+  if (current.trim()) {
+    parts.push(current.trim())
+  }
+
+  return { parts, operators }
+}
+
+/**
+ * 构建逻辑表达式树
+ */
+function buildLogicalTree(
+  parts: string[],
+  operators: LogicalOperator[],
+  originalExpr: string
+): ParseResult {
+  if (parts.length === 0) {
+    return { success: false, error: '空表达式' }
+  }
+
+  if (parts.length === 1) {
+    return parseSingleExpression(parts[0])
+  }
+
+  // 递归构建树（左结合）
+  const firstResult = parseSingleExpression(parts[0])
+  if (!firstResult.success || !firstResult.expression) {
+    return firstResult
+  }
+
+  let currentNode: UniversalExpression | LogicalExpressionNode = firstResult.expression
+
+  for (let i = 0; i < operators.length; i++) {
+    const nextResult = parseSingleExpression(parts[i + 1])
+    if (!nextResult.success || !nextResult.expression) {
+      return nextResult
+    }
+
+    // 创建逻辑节点
+    const logicalNode: LogicalExpressionNode = {
+      type: 'logical',
+      operator: operators[i],
+      left: currentNode,
+      right: nextResult.expression
+    }
+
+    currentNode = logicalNode
+  }
+
+  // 包装为 UniversalExpression
+  const result: UniversalExpression = {
+    type: 'logical',
+    value: originalExpr,
+    logical: currentNode as LogicalExpressionNode
+  }
+
+  return { success: true, expression: result }
+}
+
+/**
  * 解析逻辑表达式（包含 || 或 &&）
  */
 function parseLogicalExpression(expr: string): ParseResult {
-  // 简化处理：暂时作为单个表达式返回
-  // 完整实现需要解析为表达式树
-  const type = detectExpressionType(expr)
+  const { parts, operators } = splitByLogicalOperators(expr)
 
-  return {
-    success: true,
-    expression: {
-      type,
-      value: stripPrefix(expr, type)
-    }
+  if (operators.length === 0) {
+    // 没有逻辑运算符，按单个表达式处理
+    return parseSingleExpression(expr)
   }
+
+  return buildLogicalTree(parts, operators, expr)
 }
 
 /**
@@ -135,11 +249,33 @@ function stripPrefix(expr: string, type: ExpressionType): string {
 }
 
 /**
+ * 将逻辑表达式树序列化为字符串
+ */
+export function stringifyLogicalExpression(node: LogicalExpressionNode): string {
+  const leftStr =
+    node.left.type === 'logical'
+      ? stringifyLogicalExpression(node.left as LogicalExpressionNode)
+      : stringifyExpression(node.left as UniversalExpression)
+
+  const rightStr =
+    node.right.type === 'logical'
+      ? stringifyLogicalExpression(node.right as LogicalExpressionNode)
+      : stringifyExpression(node.right as UniversalExpression)
+
+  return `${leftStr} ${node.operator} ${rightStr}`
+}
+
+/**
  * 将结构化表达式序列化为字符串
  * @param expression 结构化表达式
  * @returns 表达式字符串
  */
 export function stringifyExpression(expression: UniversalExpression): string {
+  // 如果是逻辑表达式
+  if (expression.type === 'logical' && expression.logical) {
+    return stringifyLogicalExpression(expression.logical)
+  }
+
   const prefix = EXPRESSION_PREFIXES[expression.type]
   let result = prefix + expression.value
 

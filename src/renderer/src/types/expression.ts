@@ -6,7 +6,12 @@
 /**
  * 表达式类型枚举
  */
-export type ExpressionType = 'css' | 'xpath' | 'json' | 'js' | 'regex' | 'literal'
+export type ExpressionType = 'css' | 'xpath' | 'json' | 'js' | 'regex' | 'literal' | 'logical'
+
+/**
+ * 逻辑运算符类型
+ */
+export type LogicalOperator = '||' | '&&'
 
 /**
  * 正则替换配置
@@ -32,6 +37,16 @@ export interface PostProcessConfig {
 }
 
 /**
+ * 逻辑表达式节点
+ */
+export interface LogicalExpressionNode {
+  type: 'logical'
+  operator: LogicalOperator
+  left: UniversalExpression | LogicalExpressionNode
+  right: UniversalExpression | LogicalExpressionNode
+}
+
+/**
  * 通用表达式结构
  */
 export interface UniversalExpression {
@@ -46,6 +61,9 @@ export interface UniversalExpression {
 
   // 级联规则（链式处理）
   next?: UniversalExpression
+
+  // 逻辑表达式支持
+  logical?: LogicalExpressionNode
 }
 
 /**
@@ -66,7 +84,8 @@ export const EXPRESSION_PREFIXES: Record<ExpressionType, string> = {
   json: '@json:',
   js: '@js:',
   regex: '@regex:',
-  literal: ''
+  literal: '',
+  logical: '' // 逻辑表达式没有特定前缀
 }
 
 /**
@@ -99,6 +118,114 @@ export const CSS_ATTR_KEYWORDS = [
 
 export type CssAttrKeyword = (typeof CSS_ATTR_KEYWORDS)[number]
 
+// ============================================================
+// 变量类型定义
+// ============================================================
+
+/**
+ * 变量类型枚举
+ */
+export enum VariableType {
+  // 基础变量
+  HOST = 'host', // 域名
+  KEYWORD = 'keyword', // 搜索关键词
+  PAGE = 'page', // 页码
+
+  // URL相关
+  BASE_URL = 'baseUrl', // 基础 URL
+  CURRENT_URL = 'currentUrl', // 当前页面 URL
+
+  // 上下文变量（上一步结果）
+  RESULT = 'result', // 上一步完整结果
+  RESULT_URL = 'result.url',
+  RESULT_NAME = 'result.name',
+  RESULT_COVER = 'result.cover',
+  RESULT_AUTHOR = 'result.author',
+
+  // 时间变量
+  TIMESTAMP = 'timestamp', // 当前时间戳
+  DATE = 'date', // 当前日期
+
+  // 用户变量
+  COOKIE = 'cookie', // Cookie
+  USER_AGENT = 'userAgent' // UA
+}
+
+/**
+ * 变量映射配置
+ */
+export interface VariableMapping {
+  universal: string // 通用格式 {{xxx}}
+  anyReader?: string // any-reader 格式 $xxx
+  legado?: string // Legado 格式 {{xxx}} 或特殊格式
+}
+
+/**
+ * 变量映射表
+ */
+export const VARIABLE_MAPPINGS: Record<VariableType, VariableMapping> = {
+  [VariableType.HOST]: {
+    universal: '{{host}}',
+    anyReader: '$host',
+    legado: '{{baseUrl}}'
+  },
+  [VariableType.KEYWORD]: {
+    universal: '{{keyword}}',
+    anyReader: '$keyword',
+    legado: '{{key}}'
+  },
+  [VariableType.PAGE]: {
+    universal: '{{page}}',
+    anyReader: '$page',
+    legado: '{{page}}'
+  },
+  [VariableType.BASE_URL]: {
+    universal: '{{baseUrl}}',
+    anyReader: '$host',
+    legado: '{{baseUrl}}'
+  },
+  [VariableType.CURRENT_URL]: {
+    universal: '{{currentUrl}}',
+    legado: '{{url}}'
+  },
+  [VariableType.RESULT]: {
+    universal: '{{result}}',
+    legado: '{{result}}'
+  },
+  [VariableType.RESULT_URL]: {
+    universal: '{{result.url}}',
+    legado: '{{result.bookUrl}}'
+  },
+  [VariableType.RESULT_NAME]: {
+    universal: '{{result.name}}',
+    legado: '{{result.name}}'
+  },
+  [VariableType.RESULT_COVER]: {
+    universal: '{{result.cover}}',
+    legado: '{{result.coverUrl}}'
+  },
+  [VariableType.RESULT_AUTHOR]: {
+    universal: '{{result.author}}',
+    legado: '{{result.author}}'
+  },
+  [VariableType.TIMESTAMP]: {
+    universal: '{{timestamp}}',
+    legado: '{{System.currentTimeMillis()}}'
+  },
+  [VariableType.DATE]: {
+    universal: '{{date}}',
+    legado: '{{java.time.LocalDate.now()}}'
+  },
+  [VariableType.COOKIE]: {
+    universal: '{{cookie}}',
+    legado: '{{cookie}}'
+  },
+  [VariableType.USER_AGENT]: {
+    universal: '{{userAgent}}',
+    legado: '{{userAgent}}'
+  }
+}
+
 /**
  * 检测表达式类型
  * @param expr 表达式字符串
@@ -124,7 +251,7 @@ export function detectExpressionType(expr: string): ExpressionType {
   if (trimmed.startsWith('<js>') && trimmed.includes('</js>')) return 'js'
 
   // 检查是否像 CSS 选择器（包含常见 CSS 字符）
-  if (/^[.#\[]/.test(trimmed) || /^[a-z]+[.#\[]/i.test(trimmed)) {
+  if (/^[.#[]/.test(trimmed) || /^[a-z]+[.#[]/i.test(trimmed)) {
     return 'css'
   }
 
@@ -176,12 +303,13 @@ export function normalizeExpression(expr: string): string {
     }
   }
 
-  // CSS 选择器添加前缀
-  if (type === 'css') {
+  // 对于明确的 CSS 选择器添加前缀（必须以 . # [ 开头，或者是 tag.class 格式）
+  // 但不对裸字段名（如 author, name）添加前缀
+  if (type === 'css' && /^[.#[]/.test(trimmed)) {
     return '@css:' + trimmed
   }
 
-  // 字面量不添加前缀
+  // 字面量和其他不确定类型不添加前缀
   return trimmed
 }
 

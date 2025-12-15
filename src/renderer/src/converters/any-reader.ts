@@ -51,10 +51,19 @@ export class AnyReaderConverter implements RuleConverter<Rule> {
       host: rule.host,
       icon: rule.icon,
       author: rule.author,
+      group: rule.group,
       sort: rule.sort,
+      enabled: true, // any-reader 规则默认启用
       contentType: CONTENT_TYPE_TO_UNIVERSAL[rule.contentType] || UniversalContentType.NOVEL,
       userAgent: rule.userAgent,
       loadJs: rule.loadJs,
+      // any-reader 基本设置特有字段
+      anyReader: {
+        useCryptoJS: rule.useCryptoJS,
+        cookies: rule.cookies,
+        postScript: rule.postScript,
+        viewStyle: rule.viewStyle
+      },
       _meta: {
         sourceFormat: 'any-reader',
         updatedAt: Date.now(),
@@ -82,6 +91,8 @@ export class AnyReaderConverter implements RuleConverter<Rule> {
       universal.content = this.convertContentRuleToUniversal(rule)
     }
 
+    // any-reader 的 loginUrl 不转换为通用规则（登录是平台特有功能）
+
     return universal
   }
 
@@ -97,23 +108,46 @@ export class AnyReaderConverter implements RuleConverter<Rule> {
       contentType: UNIVERSAL_TO_CONTENT_TYPE[rule.contentType] as ContentType,
       sort: rule.sort,
       author: rule.author,
+      group: rule.group,
       userAgent: rule.userAgent,
-      loadJs: rule.loadJs
+      loadJs: rule.loadJs,
+      // any-reader 特有字段
+      useCryptoJS: rule.anyReader?.useCryptoJS,
+      cookies: rule.anyReader?.cookies,
+      postScript: rule.anyReader?.postScript,
+      viewStyle: rule.anyReader?.viewStyle,
+      // any-reader 的 loginUrl 保持原样（不从通用规则提取）
+      loginUrl: undefined
     }
 
     // 转换搜索规则
     if (rule.search) {
       Object.assign(anyReaderRule, this.convertSearchRuleFromUniversal(rule.search))
+      // any-reader 特有搜索字段 (从 search.anyReader 提取)
+      if (rule.search.anyReader?.items) {
+        anyReaderRule.searchItems = rule.search.anyReader.items
+      }
     }
 
     // 转换章节规则
     if (rule.chapter) {
       Object.assign(anyReaderRule, this.convertChapterRuleFromUniversal(rule.chapter))
+      // any-reader 特有章节字段 (从 chapter.anyReader 提取)
+      if (rule.chapter.anyReader?.items) {
+        anyReaderRule.chapterItems = rule.chapter.anyReader.items
+      }
+      if (rule.chapter.anyReader?.lock) {
+        anyReaderRule.chapterLock = rule.chapter.anyReader.lock
+      }
     }
 
     // 转换发现页规则
     if (rule.discover) {
       Object.assign(anyReaderRule, this.convertDiscoverRuleFromUniversal(rule.discover))
+      // any-reader 特有发现页字段 (从 discover.anyReader 提取)
+      if (rule.discover.anyReader?.items) {
+        anyReaderRule.discoverItems = rule.discover.anyReader.items
+      }
     }
 
     // 转换正文规则
@@ -193,7 +227,10 @@ export class AnyReaderConverter implements RuleConverter<Rule> {
       author: rule.searchAuthor,
       description: rule.searchDescription,
       latestChapter: rule.searchChapter,
-      result: rule.searchResult ?? ''
+      tags: rule.searchTags,
+      result: rule.searchResult ?? '',
+      // any-reader 特有字段
+      anyReader: rule.searchItems ? { items: rule.searchItems } : undefined
     }
   }
 
@@ -207,6 +244,7 @@ export class AnyReaderConverter implements RuleConverter<Rule> {
       searchAuthor: search.author,
       searchDescription: search.description,
       searchChapter: search.latestChapter,
+      searchTags: search.tags,
       searchResult: search.result
     }
   }
@@ -219,7 +257,20 @@ export class AnyReaderConverter implements RuleConverter<Rule> {
       cover: rule.chapterCover,
       time: rule.chapterTime,
       result: rule.chapterResult ?? '',
-      nextUrl: rule.chapterNextUrl
+      nextUrl: rule.chapterNextUrl,
+      // 多线路支持
+      multiRoads: rule.enableMultiRoads
+        ? {
+            enabled: true,
+            roads: rule.chapterRoads,
+            roadName: rule.chapterRoadName
+          }
+        : undefined,
+      // any-reader 特有字段
+      anyReader:
+        rule.chapterItems || rule.chapterLock
+          ? { items: rule.chapterItems, lock: rule.chapterLock }
+          : undefined
     }
   }
 
@@ -231,7 +282,11 @@ export class AnyReaderConverter implements RuleConverter<Rule> {
       chapterCover: chapter.cover,
       chapterTime: chapter.time,
       chapterResult: chapter.result,
-      chapterNextUrl: chapter.nextUrl
+      chapterNextUrl: chapter.nextUrl,
+      // 多线路支持
+      enableMultiRoads: chapter.multiRoads?.enabled,
+      chapterRoads: chapter.multiRoads?.roads,
+      chapterRoadName: chapter.multiRoads?.roadName
     }
   }
 
@@ -247,7 +302,9 @@ export class AnyReaderConverter implements RuleConverter<Rule> {
       tags: rule.discoverTags,
       latestChapter: rule.discoverChapter,
       result: rule.discoverResult ?? '',
-      nextUrl: rule.discoverNextUrl
+      nextUrl: rule.discoverNextUrl,
+      // any-reader 特有字段
+      anyReader: rule.discoverItems ? { items: rule.discoverItems } : undefined
     }
   }
 

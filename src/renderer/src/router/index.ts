@@ -8,6 +8,11 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: Home
+    },
+    {
+      path: '/batch-test',
+      name: 'batchTest',
+      component: () => import('../views/BatchTest.vue')
     }
   ]
 })

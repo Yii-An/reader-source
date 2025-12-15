@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import * as cheerio from 'cheerio'
 import puppeteer, { Browser, Page } from 'puppeteer'
+import { JSONPath } from 'jsonpath-plus'
 
 // ===== 配置变量（可通过设置修改）=====
 const CLOUDFLARE_WAIT_TIME = 5000 // Cloudflare 等待时间（毫秒）
@@ -213,7 +214,9 @@ async function handleProxy(request: ProxyRequest): Promise<ProxyResponse> {
     // 获取页面内容
     const html = await page.content()
     console.log('Got HTML content, length:', html.length)
-    console.log('HTML content:', html)
+    // 压缩 HTML 为一行并截断，避免日志过长
+    const compressedHtml = html.replace(/\s+/g, ' ').substring(0, 200)
+    console.log('HTML preview:', compressedHtml + (html.length > 200 ? '...' : ''))
     console.log('Final page title:', await page.title())
     console.log('='.repeat(50))
 
@@ -295,7 +298,16 @@ function xpathToCssSelector(xpath: string): string {
 function handleParse(request: ParseRequest): ParseResponse {
   const { html, listRule, contentRule, fields, host } = request
 
+  console.log('[Parse] ========== 开始解析 ==========')
+  console.log('[Parse] 请求参数:')
+  console.log(`  ├── host: ${host || '(未设置)'}`)
+  console.log(`  ├── listRule: ${listRule || '(未设置)'}`)
+  console.log(`  ├── contentRule: ${contentRule || '(未设置)'}`)
+  console.log(`  └── fields: ${JSON.stringify(fields || {})}`)
+  console.log(`[Parse] HTML 长度: ${html?.length || 0} 字符`)
+
   if (!html) {
+    console.log('[Parse] ❌ 错误: HTML 内容为空')
     return { success: false, error: 'HTML is required' }
   }
 
@@ -304,23 +316,163 @@ function handleParse(request: ParseRequest): ParseResponse {
 
     if (contentRule) {
       const content: string[] = []
-      // 对于 XPath 规则，不移除 @ 字符（因为 [@class=...] 是有效语法）
-      // 对于 CSS 规则，移除末尾的 @attr 部分
       let selector = contentRule.trim()
+      let attr = 'text' // 默认提取文本
+
+      // 解析 @attr 部分
+      const attrMatch = selector.match(/@([a-zA-Z-]+)$/)
+      if (attrMatch) {
+        attr = attrMatch[1]
+        selector = selector.slice(0, -attrMatch[0].length).trim()
+      }
+
+      // 对于 XPath 规则，转换为 CSS
       if (isXPathRule(selector)) {
-        console.log('[Parse] Content rule (XPath):', selector)
+        console.log('[Parse] Content rule (XPath):', selector, '@' + attr)
         selector = xpathToCssSelector(selector)
       } else {
-        // CSS 规则：移除末尾的 @attr 部分
-        selector = selector.replace(/@[^@[\]]*$/, '').trim()
-        console.log('[Parse] Content rule (CSS):', selector)
+        console.log('[Parse] Content rule (CSS):', selector, '@' + attr)
       }
+
+      console.log('[Parse] Final content selector:', selector, 'attr:', attr)
+
       $(selector).each((_, el) => {
-        const text = $(el).text().trim()
-        if (text) content.push(text)
+        let value = ''
+        const $el = $(el)
+
+        switch (attr) {
+          case 'text':
+            value = $el.text().trim()
+            break
+          case 'html':
+            value = $el.html() || ''
+            break
+          case 'src':
+            value = $el.attr('src') || ''
+            break
+          case 'href':
+            value = $el.attr('href') || ''
+            break
+          default:
+            // 支持任意属性如 data-original, data-src 等
+            value = $el.attr(attr) || ''
+        }
+
+        if (value) content.push(value)
       })
+
       console.log('[Parse] Found content items:', content.length)
+      if (content.length > 0) {
+        console.log('[Parse] First content sample:', content[0].substring(0, 100))
+      }
       return { success: true, data: content }
+    }
+
+    // 检测是否为 JSONPath 规则
+    const isJsonPath = (rule: string): boolean => rule.startsWith('$.') || rule.startsWith('@json:')
+
+    if (listRule && fields && isJsonPath(listRule.trim())) {
+      // JSONPath 解析
+      const jsonPathRule = listRule.trim().replace(/^@json:/, '')
+      console.log('[Parse] List rule (JSONPath):', jsonPathRule)
+      console.log('[Parse] Fields:', JSON.stringify(fields))
+
+      try {
+        // 尝试解析 JSON（处理 Puppeteer 返回的 HTML 包裹的 JSON）
+        let jsonStr = html
+
+        // 如果是 HTML 包裹的 JSON（Puppeteer 渲染结果），从 <pre> 或 <body> 中提取
+        if (html.trim().startsWith('<')) {
+          console.log('[Parse] 检测到 HTML 包裹，尝试提取 JSON...')
+          // 尝试从 <pre> 标签中提取
+          const preMatch = html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i)
+          if (preMatch) {
+            jsonStr = preMatch[1]
+            console.log('[Parse] 从 <pre> 标签提取 JSON，长度:', jsonStr.length)
+          } else {
+            // 尝试从 <body> 标签中提取
+            const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
+            if (bodyMatch) {
+              jsonStr = bodyMatch[1].replace(/<[^>]+>/g, '').trim()
+              console.log('[Parse] 从 <body> 标签提取 JSON，长度:', jsonStr.length)
+            }
+          }
+        }
+
+        const jsonData = JSON.parse(jsonStr)
+        console.log('[Parse] JSON 解析成功')
+
+        // 使用 JSONPath 提取列表
+        let items = JSONPath({ path: jsonPathRule, json: jsonData })
+        console.log('[Parse] JSONPath 匹配到', items.length, '个元素')
+
+        // 如果结果是嵌套数组（如 $..lists 返回 [[item1, item2...]]），展平它
+        if (items.length === 1 && Array.isArray(items[0])) {
+          console.log('[Parse] 检测到嵌套数组，展平处理')
+          items = items[0]
+          console.log('[Parse] 展平后元素数:', items.length)
+        }
+
+        const results: Record<string, unknown>[] = []
+        for (let i = 0; i < items.length; i++) {
+          const item: Record<string, unknown> = {}
+          const dataItem = items[i]
+
+          // 只为第一个 item 打印详细日志
+          if (i === 0) {
+            console.log('[Parse] ========== 解析第 1 个列表项 ==========')
+            console.log('[Parse] Item JSON:', JSON.stringify(dataItem).substring(0, 300))
+          }
+
+          for (const [key, fieldRule] of Object.entries(fields)) {
+            if (!fieldRule) continue
+            const rule = String(fieldRule)
+
+            if (rule.startsWith('$.')) {
+              // JSONPath 提取
+              const values = JSONPath({ path: rule, json: dataItem })
+              item[key] = values.length > 0 ? values[0] : ''
+              if (i === 0) {
+                console.log(
+                  `[Parse:${key}] JSONPath: "${rule}" -> "${String(item[key]).substring(0, 50)}"`
+                )
+              }
+            } else if (rule.startsWith('@js:')) {
+              // JavaScript 规则暂不支持
+              if (i === 0) console.log(`[Parse:${key}] @js: 规则暂不支持`)
+              item[key] = ''
+            } else {
+              // 直接字段名
+              item[key] = dataItem[rule] || dataItem[key] || ''
+              if (i === 0) {
+                console.log(
+                  `[Parse:${key}] 直接字段: "${rule}" -> "${String(item[key]).substring(0, 50)}"`
+                )
+              }
+            }
+          }
+
+          if (item.name || item.url) {
+            results.push(item)
+          }
+        }
+
+        // 详细的结果统计日志
+        console.log('[Parse] ========== 解析完成 ==========')
+        console.log(`[Parse] ✅ 匹配到 ${results.length} 条结果`)
+        if (results.length > 0) {
+          console.log('[Parse] 前3条示例数据:')
+          results.slice(0, 3).forEach((it, idx) => {
+            console.log(`  ${idx + 1}. name: "${String(it.name || '').substring(0, 50)}"`)
+            console.log(`     url: "${String(it.url || '').substring(0, 100)}"`)
+          })
+        }
+        return { success: true, data: results }
+      } catch (jsonError) {
+        const msg = jsonError instanceof Error ? jsonError.message : String(jsonError)
+        console.log('[Parse] ❌ JSON 解析失败:', msg)
+        return { success: false, error: `JSON 解析失败: ${msg}` }
+      }
     }
 
     if (listRule && fields) {
@@ -338,13 +490,31 @@ function handleParse(request: ParseRequest): ParseResponse {
       console.log('[Parse] Final selector:', selector)
       console.log('[Parse] Fields:', JSON.stringify(fields))
 
-      $(selector).each((_, element) => {
+      const $listItems = $(selector)
+      console.log('[Parse] 列表选择器匹配到', $listItems.length, '个元素')
+
+      $listItems.each((index, element) => {
         const item: Record<string, unknown> = {}
         const $el = $(element)
 
+        // 只打印第一个 item 的 HTML 预览
+        if (index === 0) {
+          const itemHtml = ($el.prop('outerHTML') || '').replace(/\s+/g, ' ')
+          console.log('[Parse] ========== 解析第 1 个列表项 ==========')
+          console.log(
+            '[Parse] Item HTML (前200字符):',
+            itemHtml.substring(0, 200) + (itemHtml.length > 200 ? '...' : '')
+          )
+        }
+
         for (const [key, rule] of Object.entries(fields)) {
           if (!rule) continue
-          item[key] = extractValue($el, rule, host)
+          // 只为第一个 item 打印详细日志
+          if (index === 0) {
+            item[key] = extractValue($el, rule, host, key)
+          } else {
+            item[key] = extractValueSilent($el, rule, host)
+          }
         }
 
         if (item.name || item.url) {
@@ -352,11 +522,35 @@ function handleParse(request: ParseRequest): ParseResponse {
         }
       })
 
-      console.log('[Parse] Found items:', results.length)
+      // 详细的结果统计日志
+      console.log('[Parse] ========== 解析完成 ==========')
+      console.log(`[Parse] ✅ 匹配到 ${results.length} 条结果`)
       if (results.length > 0) {
-        console.log('[Parse] First item sample:', JSON.stringify(results[0]))
+        console.log('[Parse] 前3条示例数据:')
+        results.slice(0, 3).forEach((item, idx) => {
+          console.log(`  ${idx + 1}. name: "${String(item.name || '').substring(0, 50)}"`)
+          console.log(`     url: "${String(item.url || '').substring(0, 100)}"`)
+          if (item.author) console.log(`     author: "${String(item.author).substring(0, 30)}"`)
+          if (item.cover) console.log(`     cover: "${String(item.cover).substring(0, 80)}"`)
+        })
       }
       return { success: true, data: results }
+    }
+
+    // 只有 fields 没有 listRule 时，在整个文档上直接提取字段
+    if (!listRule && fields) {
+      console.log('[Parse] 无列表规则，直接在文档根节点提取字段')
+      const item: Record<string, unknown> = {}
+      const $root = $.root()
+
+      for (const [key, rule] of Object.entries(fields)) {
+        if (!rule) continue
+        item[key] = extractValue($root, rule, host, key)
+      }
+
+      console.log('[Parse] ========== 解析完成 ==========')
+      console.log('[Parse] 提取的字段:', JSON.stringify(item))
+      return { success: true, data: [item] }
     }
 
     return { success: false, error: 'Invalid parse request' }
@@ -368,7 +562,123 @@ function handleParse(request: ParseRequest): ParseResponse {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractValue($context: any, rule: string, host?: string): string {
+function extractValue($context: any, rule: string, host?: string, fieldName?: string): string {
+  const logPrefix = fieldName ? `[Parse:${fieldName}]` : '[Parse:extractValue]'
+
+  // 解析 ##pattern##replacement 正则替换语法
+  let replacePattern: string | null = null
+  let replaceWith: string | null = null
+  const replaceMatch = rule.match(/##([^#]*)##([^#]*)$/)
+  if (replaceMatch) {
+    replacePattern = replaceMatch[1]
+    replaceWith = replaceMatch[2]
+    rule = rule.slice(0, -replaceMatch[0].length) // 移除替换部分
+    console.log(`${logPrefix} 规则: "${rule}" 正则替换: ##${replacePattern}##${replaceWith}`)
+  } else {
+    console.log(`${logPrefix} 规则: "${rule}"`)
+  }
+
+  const atIndex = rule.lastIndexOf('@')
+  let selector = ''
+  let attr = 'text'
+
+  if (rule.startsWith('@')) {
+    attr = rule.slice(1)
+  } else if (atIndex > 0) {
+    selector = rule.substring(0, atIndex).trim()
+    attr = rule.substring(atIndex + 1).trim()
+  } else {
+    selector = rule
+  }
+
+  console.log(`${logPrefix} 选择器: "${selector}", 属性: "${attr}"`)
+
+  let $target = selector ? $context.find(selector) : $context
+  const foundCount = $target.length
+  console.log(`${logPrefix} 找到 ${foundCount} 个元素`)
+
+  if ($target.length === 0) {
+    console.log(`${logPrefix} 未找到元素，使用上下文元素`)
+    $target = $context
+  }
+
+  // 打印目标元素的 HTML 预览（压缩为一行）
+  const targetHtml = ($target.first().prop('outerHTML') || '').replace(/\s+/g, ' ')
+  console.log(
+    `${logPrefix} 目标元素 HTML (前200字符): ${targetHtml.substring(0, 200)}${targetHtml.length > 200 ? '...' : ''}`
+  )
+
+  let value = ''
+  switch (attr) {
+    case 'text':
+      value = $target.first().text().trim()
+      break
+    case 'html':
+      value = $target.first().html() || ''
+      break
+    case 'href':
+      value = $target.first().attr('href') || ''
+      break
+    case 'src':
+      value = $target.first().attr('src') || ''
+      break
+    default:
+      value = $target.first().attr(attr) || $target.first().text().trim()
+  }
+
+  // 压缩换行符以便日志显示在一行
+  const compressedValue = value.replace(/\s+/g, ' ').substring(0, 100)
+  console.log(`${logPrefix} 原始值: "${compressedValue}${value.length > 100 ? '...' : ''}"`)
+
+  // 应用正则替换
+  if (replacePattern !== null && replaceWith !== null) {
+    try {
+      const regex = new RegExp(replacePattern)
+      const originalValue = value
+      value = value.replace(regex, replaceWith)
+      console.log(
+        `${logPrefix} 正则替换后: "${value}" (原值: "${originalValue.substring(0, 100)}")`
+      )
+    } catch (e) {
+      console.error(`${logPrefix} 正则替换失败:`, e)
+    }
+  }
+
+  // 处理相对 URL
+  if ((attr === 'href' || attr === 'src') && value && host && !value.startsWith('http')) {
+    // 协议相对 URL（以 // 开头）：补全协议
+    if (value.startsWith('//')) {
+      const protocol = host.startsWith('https') ? 'https:' : 'http:'
+      value = protocol + value
+    } else {
+      // 普通相对路径：拼接 host
+      const baseHost = host.endsWith('/') ? host.slice(0, -1) : host
+      value = value.startsWith('/') ? baseHost + value : baseHost + '/' + value
+    }
+    console.log(`${logPrefix} URL 补全后: "${value}"`)
+  }
+
+  const finalCompressed = value.replace(/\s+/g, ' ').substring(0, 100)
+  console.log(`${logPrefix} 最终值: "${finalCompressed}${value.length > 100 ? '...' : ''}"`)
+  return value
+}
+
+/**
+ * 静默版本的 extractValue，不打印日志
+ * 用于除第一个 item 之外的其他项目，避免日志过多
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractValueSilent($context: any, rule: string, host?: string): string {
+  // 解析 ##pattern##replacement 正则替换语法
+  let replacePattern: string | null = null
+  let replaceWith: string | null = null
+  const replaceMatch = rule.match(/##([^#]*)##([^#]*)$/)
+  if (replaceMatch) {
+    replacePattern = replaceMatch[1]
+    replaceWith = replaceMatch[2]
+    rule = rule.slice(0, -replaceMatch[0].length)
+  }
+
   const atIndex = rule.lastIndexOf('@')
   let selector = ''
   let attr = 'text'
@@ -403,9 +713,27 @@ function extractValue($context: any, rule: string, host?: string): string {
       value = $target.first().attr(attr) || $target.first().text().trim()
   }
 
+  // 应用正则替换
+  if (replacePattern !== null && replaceWith !== null) {
+    try {
+      const regex = new RegExp(replacePattern)
+      value = value.replace(regex, replaceWith)
+    } catch {
+      // 忽略错误
+    }
+  }
+
+  // 处理相对 URL
   if ((attr === 'href' || attr === 'src') && value && host && !value.startsWith('http')) {
-    const baseHost = host.endsWith('/') ? host.slice(0, -1) : host
-    value = value.startsWith('/') ? baseHost + value : baseHost + '/' + value
+    // 协议相对 URL（以 // 开头）：补全协议
+    if (value.startsWith('//')) {
+      const protocol = host.startsWith('https') ? 'https:' : 'http:'
+      value = protocol + value
+    } else {
+      // 普通相对路径：拼接 host
+      const baseHost = host.endsWith('/') ? host.slice(0, -1) : host
+      value = value.startsWith('/') ? baseHost + value : baseHost + '/' + value
+    }
   }
 
   return value
@@ -519,10 +847,12 @@ async function handleExecuteJs(request: ExecuteJsRequest): Promise<ExecuteJsResp
     // result 变量包含页面 HTML
     const data = await page.evaluate(
       (params: { html: string; code: string }) => {
-        const result = params.html
         try {
+          // 注入 result 变量，使其包含页面 HTML，供用户脚本使用
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const result = params.html
+          void result // 显式使用变量以避免 TS 错误
           // 使用 eval，它会返回最后一个表达式的值
-          // eslint-disable-next-line no-eval
           return eval(params.code)
         } catch (e) {
           const err = e as Error
@@ -683,22 +1013,56 @@ async function handleParseInPage(request: ParseInPageRequest): Promise<ParseResp
         }
       }
 
-      // 辅助函数：从规则中提取值
-      function extractValue(element: Element, rule: string, host: string): string {
+      // 辅助函数：从规则中提取值（带日志收集）
+      function extractValue(
+        element: Element,
+        rule: string,
+        host: string,
+        fieldName: string,
+        itemIndex: number,
+        logs: string[]
+      ): string {
         if (!rule) return ''
 
+        // 解析 ##pattern##replacement 或 ##pattern 正则替换语法
+        let replacePattern: string | null = null
+        let replaceWith: string | null = null
+        let cleanRule = rule
+
+        // 优先匹配 ##pattern##replacement 格式
+        const doubleMatch = rule.match(/##([^#]*)##([^#]*)$/)
+        if (doubleMatch) {
+          replacePattern = doubleMatch[1]
+          replaceWith = doubleMatch[2]
+          cleanRule = rule.slice(0, -doubleMatch[0].length)
+        } else {
+          // 匹配 ##pattern 格式（删除匹配内容）
+          const singleMatch = rule.match(/##([^#]+)$/)
+          if (singleMatch) {
+            replacePattern = singleMatch[1]
+            replaceWith = ''
+            cleanRule = rule.slice(0, -singleMatch[0].length)
+          }
+        }
+
         // 解析规则：selector@attr 或 @attr
-        const atIndex = rule.lastIndexOf('@')
+        const atIndex = cleanRule.lastIndexOf('@')
         let selector = ''
         let attr = 'text'
 
-        if (rule.startsWith('@')) {
-          attr = rule.slice(1)
+        if (cleanRule.startsWith('@')) {
+          attr = cleanRule.slice(1)
         } else if (atIndex > 0) {
-          selector = rule.substring(0, atIndex).trim()
-          attr = rule.substring(atIndex + 1).trim()
+          selector = cleanRule.substring(0, atIndex).trim()
+          attr = cleanRule.substring(atIndex + 1).trim()
         } else {
-          selector = rule
+          selector = cleanRule
+        }
+
+        // 只为第一个item记录详细日志
+        if (itemIndex === 0) {
+          logs.push(`[字段:${fieldName}] 规则: "${rule}"`)
+          logs.push(`  ├── 选择器: "${selector || '(无)'}", 属性: "${attr}"`)
         }
 
         // 查找目标元素
@@ -714,7 +1078,16 @@ async function handleParseInPage(request: ParseInPageRequest): Promise<ParseResp
           }
         }
 
-        if (!target) return ''
+        if (!target) {
+          if (itemIndex === 0) logs.push(`  └── 结果: (未找到元素)`)
+          return ''
+        }
+
+        // 打印目标元素预览
+        if (itemIndex === 0) {
+          const preview = target.outerHTML?.substring(0, 150) || ''
+          logs.push(`  ├── 目标元素: ${preview}...`)
+        }
 
         // 提取属性值
         let value = ''
@@ -735,16 +1108,39 @@ async function handleParseInPage(request: ParseInPageRequest): Promise<ParseResp
             value = target.getAttribute(attr) || (target.textContent || '').trim()
         }
 
-        // 处理相对 URL
-        if ((attr === 'href' || attr === 'src') && value && host && !value.startsWith('http')) {
-          const baseHost = host.endsWith('/') ? host.slice(0, -1) : host
-          value = value.startsWith('/') ? baseHost + value : baseHost + '/' + value
+        if (itemIndex === 0) logs.push(`  ├── 原始值: "${value.substring(0, 100)}"`)
+
+        // 应用正则替换
+        if (replacePattern !== null && replaceWith !== null) {
+          try {
+            const regex = new RegExp(replacePattern)
+            value = value.replace(regex, replaceWith)
+            if (itemIndex === 0) logs.push(`  ├── 正则替换后: "${value.substring(0, 100)}"`)
+          } catch {
+            // 忽略正则错误
+          }
         }
 
+        // 处理相对 URL
+        if ((attr === 'href' || attr === 'src') && value && host && !value.startsWith('http')) {
+          // 协议相对 URL（以 // 开头）：补全协议
+          if (value.startsWith('//')) {
+            const protocol = host.startsWith('https') ? 'https:' : 'http:'
+            value = protocol + value
+          } else {
+            // 普通相对路径：拼接 host
+            const baseHost = host.endsWith('/') ? host.slice(0, -1) : host
+            value = value.startsWith('/') ? baseHost + value : baseHost + '/' + value
+          }
+          if (itemIndex === 0) logs.push(`  ├── URL补全后: "${value.substring(0, 100)}"`)
+        }
+
+        if (itemIndex === 0) logs.push(`  └── 最终值: "${value.substring(0, 100)}"`)
         return value
       }
 
       // 主逻辑
+      const logs: string[] = []
       try {
         // 处理正文规则
         if (params.contentRule) {
@@ -753,21 +1149,23 @@ async function handleParseInPage(request: ParseInPageRequest): Promise<ParseResp
           let elements: Element[] = []
 
           if (isXPath(rule)) {
-            console.log('[ParseInPage] Using XPath for content:', rule)
+            logs.push(`[列表] 使用 XPath 规则: ${rule}`)
             elements = getElementsByXPath(rule)
           } else {
             // CSS 规则可能包含 @attr，需要移除
             const selector = rule.replace(/@[^@[\]]*$/, '').trim()
-            console.log('[ParseInPage] Using CSS for content:', selector)
+            logs.push(`[列表] 使用 CSS 规则: ${selector}`)
             elements = getElementsByCSS(selector)
           }
+
+          logs.push(`[列表] 匹配到 ${elements.length} 个元素`)
 
           for (const el of elements) {
             const text = (el.textContent || '').trim()
             if (text) content.push(text)
           }
 
-          return { success: true, data: content, type: 'content', count: content.length }
+          return { success: true, data: content, type: 'content', count: content.length, logs }
         }
 
         // 处理列表规则
@@ -777,23 +1175,31 @@ async function handleParseInPage(request: ParseInPageRequest): Promise<ParseResp
           let elements: Element[] = []
 
           if (isXPath(rule)) {
-            console.log('[ParseInPage] Using XPath for list:', rule)
+            logs.push(`[列表] 使用 XPath 规则: ${rule}`)
             elements = getElementsByXPath(rule)
           } else {
             // CSS 规则可能包含 @attr，需要移除
             const selector = rule.replace(/@[^@[\]]*$/, '').trim()
-            console.log('[ParseInPage] Using CSS for list:', selector)
+            logs.push(`[列表] 使用 CSS 规则: ${selector}`)
             elements = getElementsByCSS(selector)
           }
 
-          console.log('[ParseInPage] Found elements:', elements.length)
+          logs.push(`[列表] 匹配到 ${elements.length} 个元素`)
 
-          for (const el of elements) {
+          // 只为第一个元素打印 HTML 预览
+          if (elements.length > 0) {
+            const preview = elements[0].outerHTML?.substring(0, 300) || ''
+            logs.push(`[列表] 第1个元素预览: ${preview}...`)
+            logs.push(`[列表] ========== 解析第1个列表项字段 ==========`)
+          }
+
+          for (let i = 0; i < elements.length; i++) {
+            const el = elements[i]
             const item: Record<string, unknown> = {}
 
             for (const [key, fieldRule] of Object.entries(params.fields)) {
               if (!fieldRule) continue
-              item[key] = extractValue(el, fieldRule as string, params.host)
+              item[key] = extractValue(el, fieldRule as string, params.host, key, i, logs)
             }
 
             if (item.name || item.url) {
@@ -801,17 +1207,40 @@ async function handleParseInPage(request: ParseInPageRequest): Promise<ParseResp
             }
           }
 
-          return { success: true, data: items, type: 'list', count: items.length }
+          return { success: true, data: items, type: 'list', count: items.length, logs }
         }
 
-        return { success: false, error: 'No rule provided' }
+        return { success: false, error: 'No rule provided', logs }
       } catch (e) {
         const err = e as Error
-        return { success: false, error: err.message }
+        return { success: false, error: err.message, logs }
       }
     }, parseParams)
 
-    console.log('[ParseInPage] Parse result:', JSON.stringify(results).substring(0, 500))
+    // 打印从浏览器收集的日志
+    if (results.logs && results.logs.length > 0) {
+      console.log('[ParseInPage] ========== 字段解析详情 ==========')
+      for (const log of results.logs) {
+        console.log(`[ParseInPage] ${log}`)
+      }
+    }
+
+    // 详细的结果日志
+    console.log('[ParseInPage] ========== 解析完成 ==========')
+    if (results.success) {
+      const data = results.data as Record<string, unknown>[]
+      console.log(`[ParseInPage] ✅ 匹配到 ${data?.length || 0} 条结果 (type: ${results.type})`)
+      if (data && data.length > 0) {
+        console.log('[ParseInPage] 前3条示例数据:')
+        data.slice(0, 3).forEach((item, idx) => {
+          console.log(`  ${idx + 1}. name: "${String(item.name || '').substring(0, 50)}"`)
+          console.log(`     url: "${String(item.url || '').substring(0, 100)}"`)
+          if (item.author) console.log(`     author: "${String(item.author).substring(0, 30)}"`)
+        })
+      }
+    } else {
+      console.log(`[ParseInPage] ❌ 解析失败: ${results.error}`)
+    }
     console.log('='.repeat(50))
 
     if (!results.success) {
@@ -846,13 +1275,24 @@ async function handleProxyImage(request: {
   try {
     // 从 URL 中提取 host 作为 referer
     const urlObj = new URL(url)
-    const defaultReferer = `${urlObj.protocol}//${urlObj.host}/`
+    let effectiveReferer = referer
+
+    // 针对特定 CDN 设置正确的 Referer
+    if (!effectiveReferer) {
+      const host = urlObj.host.toLowerCase()
+      if (host.includes('acimg.cn') || host.includes('ac.qq.com')) {
+        // 腾讯漫画 CDN 需要使用 ac.qq.com 作为 Referer
+        effectiveReferer = 'https://ac.qq.com/'
+      } else {
+        effectiveReferer = `${urlObj.protocol}//${urlObj.host}/`
+      }
+    }
 
     const response = await fetch(url, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Referer: referer || defaultReferer,
+        Referer: effectiveReferer,
         Accept: 'image/webp,image/apng,image/*,*/*;q=0.8'
       }
     })

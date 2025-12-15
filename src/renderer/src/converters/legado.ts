@@ -10,8 +10,7 @@ import type {
   UniversalDetailRule,
   UniversalChapterRule,
   UniversalDiscoverRule,
-  UniversalContentRule,
-  UniversalLoginRule
+  UniversalContentRule
 } from '../types/universal'
 import { UniversalContentType } from '../types/universal'
 import type { RuleConverter, ValidationResult, ConvertOptions } from './base'
@@ -68,8 +67,21 @@ export class LegadoConverter implements RuleConverter<LegadoRule> {
       host: host,
       group: rule.bookSourceGroup,
       sort: rule.customOrder,
+      // 高优先级通用字段
+      enabled: rule.enabled ?? true,
+      comment: rule.bookSourceComment,
+      jsLib: rule.jsLib,
       contentType: LEGADO_TYPE_TO_UNIVERSAL[rule.bookSourceType ?? 0] || UniversalContentType.NOVEL,
       headers: this.parseHeaders(rule.header),
+      // Legado 基本设置特有字段
+      legado: {
+        bookUrlPattern: rule.bookUrlPattern,
+        enabledCookieJar: rule.enabledCookieJar,
+        respondTime: rule.respondTime,
+        weight: rule.weight,
+        customOrder: rule.customOrder,
+        lastUpdateTime: rule.lastUpdateTime
+      },
       _fieldSources: {},
       _meta: {
         sourceFormat: 'legado',
@@ -103,9 +115,15 @@ export class LegadoConverter implements RuleConverter<LegadoRule> {
       universal.content = this.convertContentRuleToUniversal(rule)
     }
 
-    // 转换登录规则
-    if (rule.loginUrl) {
-      universal.login = this.convertLoginRuleToUniversal(rule)
+    // 登录字段直接存储在 legado 基本设置中
+    if (rule.loginUrl || rule.loginCheckJs || rule.loginUi) {
+      universal.legado = {
+        ...universal.legado,
+        loginUrl: rule.loginUrl,
+        loginCheckUrl: rule.loginCheckJs,
+        loginUi: rule.loginUi,
+        loginCheckJs: rule.loginCheckJs
+      }
     }
 
     return universal
@@ -120,11 +138,23 @@ export class LegadoConverter implements RuleConverter<LegadoRule> {
       bookSourceName: rule.name,
       bookSourceGroup: rule.group,
       bookSourceType: UNIVERSAL_TO_LEGADO_TYPE[rule.contentType],
+      // 高优先级通用字段
+      enabled: rule.enabled ?? true,
+      bookSourceComment: rule.comment,
+      jsLib: rule.jsLib,
       customOrder: rule.sort,
-      enabled: true,
       enabledExplore: rule.discover?.enabled ?? false,
       lastUpdateTime: rule._meta?.updatedAt || Date.now(),
-      header: rule.headers ? JSON.stringify(rule.headers) : undefined
+      header: this.stringifyHeaders(rule.headers),
+      // Legado 基本设置特有字段
+      bookUrlPattern: rule.legado?.bookUrlPattern,
+      enabledCookieJar: rule.legado?.enabledCookieJar,
+      respondTime: rule.legado?.respondTime,
+      weight: rule.legado?.weight,
+      // 登录字段从 legado 基本设置提取
+      loginUrl: rule.legado?.loginUrl,
+      loginUi: rule.legado?.loginUi,
+      loginCheckJs: rule.legado?.loginCheckJs
     }
 
     // 转换搜索规则
@@ -152,10 +182,7 @@ export class LegadoConverter implements RuleConverter<LegadoRule> {
       legadoRule.ruleContent = this.convertContentRuleFromUniversal(rule.content)
     }
 
-    // 转换登录规则
-    if (rule.login) {
-      Object.assign(legadoRule, this.convertLoginRuleFromUniversal(rule.login))
-    }
+    // 登录字段已在上方从 legado 基本设置提取
 
     return legadoRule
   }
@@ -224,10 +251,26 @@ export class LegadoConverter implements RuleConverter<LegadoRule> {
       if (header.startsWith('{')) {
         return JSON.parse(header)
       }
+      // 对于 @js: 表达式，返回一个特殊格式
+      if (header.startsWith('@js:')) {
+        return { __js_expr__: header }
+      }
       return undefined
     } catch {
       return undefined
     }
+  }
+
+  /**
+   * 将 headers 转换回 Legado 格式
+   */
+  private stringifyHeaders(headers?: Record<string, string>): string | undefined {
+    if (!headers) return undefined
+    // 如果是 JS 表达式格式
+    if (headers['__js_expr__']) {
+      return headers['__js_expr__']
+    }
+    return JSON.stringify(headers)
   }
 
   /**
@@ -368,7 +411,12 @@ export class LegadoConverter implements RuleConverter<LegadoRule> {
       items: this.normalizeExpr(rc.content) || '',
       nextUrl: this.normalizeExpr(rc.nextContentUrl),
       sourceRegex: rc.sourceRegex,
-      payAction: rc.payAction
+      payAction: rc.payAction,
+      // Legado 正文特有字段
+      legado:
+        rc.webJs || rc.replaceRegex || rc.imageStyle
+          ? { webJs: rc.webJs, replaceRegex: rc.replaceRegex, imageStyle: rc.imageStyle }
+          : undefined
     }
   }
 
@@ -379,23 +427,15 @@ export class LegadoConverter implements RuleConverter<LegadoRule> {
       content: content.items,
       nextContentUrl: content.nextUrl,
       sourceRegex: content.sourceRegex,
-      payAction: content.payAction
+      payAction: content.payAction,
+      // Legado 正文特有字段 (从 content.legado 提取)
+      webJs: content.legado?.webJs,
+      replaceRegex: content.legado?.replaceRegex,
+      imageStyle: content.legado?.imageStyle
     }
   }
 
-  private convertLoginRuleToUniversal(rule: LegadoRule): UniversalLoginRule {
-    return {
-      url: rule.loginUrl,
-      checkUrl: rule.loginCheckJs
-    }
-  }
-
-  private convertLoginRuleFromUniversal(login: UniversalLoginRule): Partial<LegadoRule> {
-    return {
-      loginUrl: login.url,
-      loginCheckJs: login.checkUrl
-    }
-  }
+  // 登录规则转换方法已移除，登录字段现在在 legado 基本设置中处理
 }
 
 /**

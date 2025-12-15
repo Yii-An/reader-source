@@ -1,15 +1,59 @@
 <script setup lang="ts">
 import { ref, onMounted, shallowRef, watch, onBeforeUnmount } from 'vue'
 import * as monaco from 'monaco-editor'
+import { universalRuleSchema } from '../schemas/universalRuleSchema'
 
 // 配置 Monaco 的 worker
 self.MonacoEnvironment = {
-  getWorker: function () {
-    return new Worker(
-      new URL('monaco-editor/esm/vs/editor/editor.worker.js', import.meta.url),
-      { type: 'module' }
-    )
+  getWorker: function (_moduleId: string, label: string) {
+    if (label === 'json') {
+      return new Worker(
+        new URL('monaco-editor/esm/vs/language/json/json.worker.js', import.meta.url),
+        { type: 'module' }
+      )
+    }
+    if (label === 'css' || label === 'scss' || label === 'less') {
+      return new Worker(
+        new URL('monaco-editor/esm/vs/language/css/css.worker.js', import.meta.url),
+        { type: 'module' }
+      )
+    }
+    if (label === 'html' || label === 'handlebars' || label === 'razor') {
+      return new Worker(
+        new URL('monaco-editor/esm/vs/language/html/html.worker.js', import.meta.url),
+        { type: 'module' }
+      )
+    }
+    if (label === 'typescript' || label === 'javascript') {
+      return new Worker(
+        new URL('monaco-editor/esm/vs/language/typescript/ts.worker.js', import.meta.url),
+        { type: 'module' }
+      )
+    }
+    // 默认使用通用 editor worker
+    return new Worker(new URL('monaco-editor/esm/vs/editor/editor.worker.js', import.meta.url), {
+      type: 'module'
+    })
   }
+}
+
+// 配置 JSON Schema 验证和智能提示
+// 注意：monaco.languages.json 类型标记为 deprecated，但 API 仍可用
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const jsonLanguage = (monaco.languages as any).json
+if (jsonLanguage?.jsonDefaults) {
+  jsonLanguage.jsonDefaults.setDiagnosticsOptions({
+    validate: true,
+    allowComments: false,
+    schemas: [
+      {
+        uri: 'https://reader-source/schemas/universal-rule.json',
+        fileMatch: ['*'],
+        schema: universalRuleSchema
+      }
+    ],
+    enableSchemaRequest: false
+  })
 }
 
 const props = defineProps<{

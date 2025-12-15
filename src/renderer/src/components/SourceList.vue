@@ -25,32 +25,41 @@ const emit = defineEmits<{
         @update:model-value="emit('update:search-query', $event as string)"
       />
     </div>
-    <div class="source-list">
-      <div
-        v-for="source in sources"
-        :key="source.id"
-        class="source-item"
-        :class="{ active: currentId === source.id }"
-        @click="emit('select', source)"
+    <div class="source-list-wrapper">
+      <a-list
+        v-if="sources.length > 0"
+        class="source-list"
+        :data="sources"
+        :bordered="false"
+        :split="false"
+        :virtual-list-props="{ height: '100%' }"
       >
-        <div class="source-item-icon">
-          <icon-book v-if="source.contentType === UniversalContentType.NOVEL" />
-          <icon-image v-else-if="source.contentType === UniversalContentType.MANGA" />
-          <icon-video-camera v-else />
-        </div>
-        <div class="source-item-info">
-          <div class="source-item-name">{{ source.name }}</div>
-          <div class="source-item-host">{{ source.host }}</div>
-        </div>
-        <a-dropdown trigger="click" @click.stop>
-          <a-button type="text" size="mini"><icon-more /></a-button>
-          <template #content>
-            <a-doption @click="emit('select', source)">编辑</a-doption>
-            <a-doption class="danger" @click="emit('delete', source)">删除</a-doption>
-          </template>
-        </a-dropdown>
-      </div>
-      <div v-if="sources.length === 0" class="empty-list">暂无书源</div>
+        <template #item="{ item: source }">
+          <div
+            class="source-item"
+            :class="{ active: currentId === source.id }"
+            @click="emit('select', source)"
+          >
+            <div class="source-item-icon">
+              <icon-book v-if="source.contentType === UniversalContentType.NOVEL" />
+              <icon-image v-else-if="source.contentType === UniversalContentType.MANGA" />
+              <icon-video-camera v-else />
+            </div>
+            <div class="source-item-info">
+              <div class="source-item-name">{{ source.name }}</div>
+              <div class="source-item-host">{{ source.host }}</div>
+            </div>
+            <a-dropdown trigger="click" @click.stop>
+              <a-button type="text" size="mini"><icon-more /></a-button>
+              <template #content>
+                <a-doption @click="emit('select', source)">编辑</a-doption>
+                <a-doption class="danger" @click="emit('delete', source)">删除</a-doption>
+              </template>
+            </a-dropdown>
+          </div>
+        </template>
+      </a-list>
+      <div v-else class="empty-list">暂无书源</div>
     </div>
   </div>
 </template>
@@ -67,10 +76,19 @@ const emit = defineEmits<{
   border-bottom: 1px solid var(--color-border);
 }
 
-.source-list {
+.source-list-wrapper {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 8px;
+}
+
+.source-list {
+  height: 100%;
+}
+
+.source-list :deep(.arco-list-item) {
+  padding: 0 !important;
+  background: transparent !important;
 }
 
 .source-item {
