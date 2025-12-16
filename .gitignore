@@ -5,5 +5,3 @@ out
 .eslintcache
 *.log*
 tmp/*
-.kilocode
-test_rules

@@ -1,0 +1,42 @@
+{
+  "id": "wzdhm1-manga-source",
+  "name": "漫小肆韓漫",
+  "host": "https://www.wzdhm1.cc",
+  "contentType": "manga",
+  "enabled": true,
+  "author": "reader-source",
+  "group": "漫画",
+  "comment": "韩漫漫画站",
+
+  "search": {
+    "enabled": true,
+    "url": "https://www.wzdhm1.cc/search?keyword=$keyword",
+    "list": ".index-original-list li",
+    "name": ".info .title a@text",
+    "cover": ".mh-cover@style##.*url\\((.*)\\).*##$1",
+    "author": ".desc@text",
+    "description": ".subtitle@text",
+    "result": ".cover a@href"
+  },
+
+  "discover": {
+    "enabled": true,
+    "url": "最近更新::/update\n排行榜::/rank\n连载中::/booklist?end=0\n已完结::/booklist?end=1\n韩国::/booklist?area=1\n都市::/booklist?tag=都市\n校园::/booklist?tag=校园\n纯爱::/booklist?tag=纯爱",
+    "list": ".index-original-list li",
+    "name": ".info .title a@text",
+    "cover": ".mh-cover@style##.*url\\((.*)\\).*##$1",
+    "author": ".desc@text",
+    "description": ".subtitle@text",
+    "result": ".cover a@href"
+  },
+
+  "chapter": {
+    "list": "#detail-list-select li",
+    "name": "a@text",
+    "result": "a@href"
+  },
+
+  "content": {
+    "items": "img.lazy@data-original"
+  }
+}

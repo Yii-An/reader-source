@@ -1,0 +1,47 @@
+{
+  "bookSourceComment": "25-04-05 靈狐 制\n25-08-18 修复正文解密\n部分书详情页封面无法访问可使用搜索封面规则",
+  "bookSourceGroup": "🎉 精选",
+  "bookSourceName": "3A小说",
+  "bookSourceType": 0,
+  "bookSourceUrl": "https://www.aaawz.cc",
+  "customButton": false,
+  "customOrder": 2,
+  "enabled": true,
+  "enabledCookieJar": false,
+  "enabledExplore": false,
+  "eventListener": false,
+  "header": "@js:JSON.stringify({\n  'Accept': \"application/json, text/plain, */*\",\n  'origin': source.key,\n  'referer': source.key+\"/\",\n  'accept-language': \"zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7\"\n})",
+  "jsLib": "function decompressFromBase64(input) {\n    if (input == null) return '';\n    if (input === '') return null;\n\n    const base64Alphabet = \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\";\n    const lookup = {};\n    for (let i = 0; i < base64Alphabet.length; i++) {\n        lookup[base64Alphabet.charAt(i)] = i;\n    }\n    function getValue(char) {\n        return lookup[char];\n    }\n\n    function decompress(length, resetValue, getNextValue) {\n        const dictionary = [];\n        let dictSize = 4;\n        let bits = 3;\n        let result = [];\n        let data = { val: getNextValue(0), position: resetValue, index: 1 };\n\n        // 读取初始控制代码（2 位）\n        let res = 0;\n        let maxPower = Math.pow(2, 2);\n        let power = 1;\n        while (power != maxPower) {\n            let bit = data.val & data.position;\n            data.position >>= 1;\n            if (data.position == 0) {\n                data.position = resetValue;\n                if (data.index > length) return '';\n                data.val = getNextValue(data.index++);\n            }\n            res |= (bit > 0 ? 1 : 0) * power;\n            power <<= 1;\n        }\n\n        let next;\n        switch (res) {\n            case 0: // 8 位字符\n                res = 0;\n                maxPower = Math.pow(2, 8);\n                power = 1;\n                while (power != maxPower) {\n                    let bit = data.val & data.position;\n                    data.position >>= 1;\n                    if (data.position == 0) {\n                        data.position = resetValue;\n                        if (data.index > length) return '';\n                        data.val = getNextValue(data.index++);\n                    }\n                    res |= (bit > 0 ? 1 : 0) * power;\n                    power <<= 1;\n                }\n                next = String.fromCharCode(res);\n                break;\n            case 1: // 16 位字符\n                res = 0;\n                maxPower = Math.pow(2, 16);\n                power = 1;\n                while (power != maxPower) {\n                    let bit = data.val & data.position;\n                    data.position >>= 1;\n                    if (data.position == 0) {\n                        data.position = resetValue;\n                        if (data.index > length) return '';\n                        data.val = getNextValue(data.index++);\n                    }\n                    res |= (bit > 0 ? 1 : 0) * power;\n                    power <<= 1;\n                }\n                next = String.fromCharCode(res);\n                break;\n            case 2: // 结束\n                return '';\n        }\n\n        // 初始化字典\n        dictionary[0] = '';\n        dictionary[1] = '';\n        dictionary[2] = '';\n        dictionary[3] = next;\n        let w = next;\n        result.push(next);\n\n        // 主解压循环\n        while (data.index <= length) {\n            let code = 0;\n            maxPower = Math.pow(2, bits);\n            power = 1;\n            while (power != maxPower) {\n                let bit = data.val & data.position;\n                data.position >>= 1;\n                if (data.position == 0) {\n                    data.position = resetValue;\n                    if (data.index > length) break;\n                    data.val = getNextValue(data.index++);\n                }\n                code |= (bit > 0 ? 1 : 0) * power;\n                power <<= 1;\n            }\n\n            if (data.index > length && code === 0) break;\n\n            switch (next = code) {\n                case 0: // 新 8 位字符\n                    res = 0;\n                    maxPower = Math.pow(2, 8);\n                    power = 1;\n                    while (power != maxPower) {\n                        let bit = data.val & data.position;\n                        data.position >>= 1;\n                        if (data.position == 0) {\n                            data.position = resetValue;\n                            if (data.index > length) return result.join('');\n                            data.val = getNextValue(data.index++);\n                        }\n                        res |= (bit > 0 ? 1 : 0) * power;\n                        power <<= 1;\n                    }\n                    dictionary[dictSize++] = String.fromCharCode(res);\n                    next = dictSize - 1;\n                    break;\n                case 1: // 新 16 位字符\n                    res = 0;\n                    maxPower = Math.pow(2, 16);\n                    power = 1;\n                    while (power != maxPower) {\n                        let bit = data.val & data.position;\n                        data.position >>= 1;\n                        if (data.position == 0) {\n                            data.position = resetValue;\n                            if (data.index > length) return result.join('');\n                            data.val = getNextValue(data.index++);\n                        }\n                        res |= (bit > 0 ? 1 : 0) * power;\n                        power <<= 1;\n                    }\n                    dictionary[dictSize++] = String.fromCharCode(res);\n                    next = dictSize - 1;\n                    break;\n                case 2: // 结束\n                    return result.join('');\n            }\n\n            if (dictSize - 1 >= Math.pow(2, bits) - 1) bits++;\n\n            let entry;\n            if (dictionary[next]) {\n                entry = dictionary[next];\n            } else if (next === dictSize) {\n                entry = w + w.charAt(0);\n            } else {\n                return null;\n            }\n\n            result.push(entry);\n            dictionary[dictSize++] = w + entry.charAt(0);\n            w = entry;\n\n            if (dictSize - 1 >= Math.pow(2, bits) - 1) bits++;\n        }\n\n        return result.join('');\n    }\n\n    return decompress(input.length, 32, (index) => getValue(input.charAt(index)));\n}",
+  "lastUpdateTime": 1756047901346,
+  "loginCheckJs": "let url = result.url()\nlet body = result.body()\nif(url.includes('-chapter-')){\n let data = java.base64DecodeToByteArray(body)\n let iv = data.slice(0,16)\n let x = java.createSymmetricCrypto('AES/CBC/PKCS7Padding',java.strToBytes('123#2^0@0vm@08.b5%$1[A]1&4115s(('), iv)\n body = x.decryptStr(data.slice(16, data.length))\n}\nPackages.io.legado.app.help.http.StrResponse(url, decompressFromBase64(String(body).replace(/\\s/g,'')))",
+  "respondTime": 4457,
+  "ruleBookInfo": {
+    "author": "author",
+    "coverUrl": "imgurl",
+    "intro": "intro",
+    "kind": "lastupdate@js:java.timeFormat(result[0]*1000)",
+    "lastChapter": "{{$.lastchapter}}·{{java.timeFormat(java.getString('$.lastupdate')*1000)}}",
+    "name": "articlename",
+    "tocUrl": "/api-chapterlist-{{$.tid}}-{{$.siteid}}"
+  },
+  "ruleContent": {
+    "content": "@js:result"
+  },
+  "ruleSearch": {
+    "author": "author##<\\/?em>",
+    "bookList": "data.books",
+    "bookUrl": "/api-info-{{$.tid}}-{{$.siteid}}",
+    "coverUrl": "tid@js:let sid = java.getString('siteid');\n'/bookimg/'+sid+'/'+result%100+'/'+result+'.jpg'",
+    "kind": "lastupdate",
+    "lastChapter": "lastchapter&&lastupdate##\\n##·",
+    "name": "articlename##<\\/?em>"
+  },
+  "ruleToc": {
+    "chapterList": "*",
+    "chapterName": "title",
+    "chapterUrl": "{{baseUrl.replace('list-','-')}}-{{$.cid}}",
+    "updateTime": "{{java.timeFormat(java.getString('$.update')*1000)}}更新 {{$.wordNum}}字"
+  },
+  "searchUrl": "/api-search,{\n  \"method\": \"POST\",\n  \"body\": 'keyword={{key}}&page={{page}}&size=10'\n}",
+  "weight": 0
+}
