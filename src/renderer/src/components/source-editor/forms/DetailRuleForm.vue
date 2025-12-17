@@ -20,88 +20,82 @@ function updateField<K extends keyof UniversalDetailRule>(
 
 <template>
   <div v-if="rule" class="detail-rule-form">
-    <a-form-item label="启用详情页">
-      <a-switch
-        :model-value="rule.enabled"
-        @update:model-value="updateField('enabled', $event as boolean)"
-      />
-    </a-form-item>
-    <a-form-item label="详情页URL">
-      <a-input
-        :model-value="rule.url"
+    <t-form-item label="启用详情页 (enabled)">
+      <t-switch :value="rule.enabled" @change="updateField('enabled', $event as boolean)" />
+    </t-form-item>
+    <t-form-item label="详情页URL (url)">
+      <t-input
+        :value="rule.url"
         placeholder="详情页 URL 模板（可选）"
-        @update:model-value="updateField('url', $event as string)"
+        @change="updateField('url', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="预处理规则">
-      <a-textarea
-        :model-value="rule.init"
+    </t-form-item>
+    <t-form-item label="预处理规则 (init)">
+      <t-textarea
+        :value="rule.init"
         placeholder="预处理规则"
-        :auto-size="{ minRows: 2 }"
-        @update:model-value="updateField('init', $event as string)"
+        :autosize="{ minRows: 2 }"
+        @change="updateField('init', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="书名规则">
-      <a-input
-        :model-value="rule.name"
+    </t-form-item>
+    <t-form-item label="书名规则 (name)">
+      <t-input
+        :value="rule.name"
         placeholder="@css:.book-name@text"
-        @update:model-value="updateField('name', $event as string)"
+        @change="updateField('name', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="作者规则">
-      <a-input
-        :model-value="rule.author"
+    </t-form-item>
+    <t-form-item label="作者规则 (author)">
+      <t-input
+        :value="rule.author"
         placeholder="@css:.author@text"
-        @update:model-value="updateField('author', $event as string)"
+        @change="updateField('author', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="封面规则">
-      <a-input
-        :model-value="rule.cover"
+    </t-form-item>
+    <t-form-item label="封面规则 (cover)">
+      <t-input
+        :value="rule.cover"
         placeholder="@css:img@src"
-        @update:model-value="updateField('cover', $event as string)"
+        @change="updateField('cover', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="简介规则">
-      <a-input
-        :model-value="rule.description"
+    </t-form-item>
+    <t-form-item label="简介规则 (description)">
+      <t-input
+        :value="rule.description"
         placeholder="@css:.intro@text"
-        @update:model-value="updateField('description', $event as string)"
+        @change="updateField('description', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="最新章节规则">
-      <a-input
-        :model-value="rule.latestChapter"
+    </t-form-item>
+    <t-form-item label="最新章节规则 (latestChapter)">
+      <t-input
+        :value="rule.latestChapter"
         placeholder="@css:.latest@text"
-        @update:model-value="updateField('latestChapter', $event as string)"
+        @change="updateField('latestChapter', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="字数规则">
-      <a-input
-        :model-value="rule.wordCount"
+    </t-form-item>
+    <t-form-item label="字数规则 (wordCount)">
+      <t-input
+        :value="rule.wordCount"
         placeholder="@css:.word-count@text"
-        @update:model-value="updateField('wordCount', $event as string)"
+        @change="updateField('wordCount', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="标签规则">
-      <a-input
-        :model-value="rule.tags"
+    </t-form-item>
+    <t-form-item label="标签规则 (tags)">
+      <t-input
+        :value="rule.tags"
         placeholder="@css:.tags@text"
-        @update:model-value="updateField('tags', $event as string)"
+        @change="updateField('tags', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="目录URL规则">
-      <a-input
-        :model-value="rule.tocUrl"
+    </t-form-item>
+    <t-form-item label="目录URL规则 (tocUrl)">
+      <t-input
+        :value="rule.tocUrl"
         placeholder="@css:.toc-link@href"
-        @update:model-value="updateField('tocUrl', $event as string)"
+        @change="updateField('tocUrl', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="允许修改书名作者">
-      <a-switch
-        :model-value="rule.canRename"
-        @update:model-value="updateField('canRename', $event as boolean)"
-      />
-    </a-form-item>
+    </t-form-item>
+    <t-form-item label="允许修改书名作者 (canRename)">
+      <t-switch :value="rule.canRename" @change="updateField('canRename', $event as boolean)" />
+    </t-form-item>
   </div>
 </template>

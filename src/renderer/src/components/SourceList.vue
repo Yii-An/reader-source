@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { BookIcon, ImageIcon, VideoIcon, EllipsisIcon, SearchIcon } from 'tdesign-icons-vue-next'
 import type { UniversalRule } from '../types/universal'
 import { UniversalContentType } from '../types/universal'
 
@@ -18,47 +19,51 @@ const emit = defineEmits<{
 <template>
   <div class="source-list-container">
     <div class="source-search">
-      <a-input-search
-        :model-value="searchQuery"
+      <t-input
+        :value="searchQuery"
         placeholder="搜索书源..."
         size="small"
-        @update:model-value="emit('update:search-query', $event as string)"
-      />
+        clearable
+        @change="emit('update:search-query', $event as string)"
+      >
+        <template #suffix-icon>
+          <search-icon />
+        </template>
+      </t-input>
     </div>
     <div class="source-list-wrapper">
-      <a-list
-        v-if="sources.length > 0"
-        class="source-list"
-        :data="sources"
-        :bordered="false"
-        :split="false"
-        :virtual-list-props="{ height: '100%' }"
-      >
-        <template #item="{ item: source }">
+      <t-list v-if="sources.length > 0" class="source-list" :split="false">
+        <t-list-item v-for="source in sources" :key="source.id">
           <div
             class="source-item"
             :class="{ active: currentId === source.id }"
             @click="emit('select', source)"
           >
             <div class="source-item-icon">
-              <icon-book v-if="source.contentType === UniversalContentType.NOVEL" />
-              <icon-image v-else-if="source.contentType === UniversalContentType.MANGA" />
-              <icon-video-camera v-else />
+              <book-icon v-if="source.contentType === UniversalContentType.NOVEL" />
+              <image-icon v-else-if="source.contentType === UniversalContentType.MANGA" />
+              <video-icon v-else />
             </div>
             <div class="source-item-info">
               <div class="source-item-name">{{ source.name }}</div>
               <div class="source-item-host">{{ source.host }}</div>
             </div>
-            <a-dropdown trigger="click" @click.stop>
-              <a-button type="text" size="mini"><icon-more /></a-button>
-              <template #content>
-                <a-doption @click="emit('select', source)">编辑</a-doption>
-                <a-doption class="danger" @click="emit('delete', source)">删除</a-doption>
+            <t-dropdown trigger="click" @click.stop>
+              <t-button variant="text" size="small">
+                <template #icon><ellipsis-icon /></template>
+              </t-button>
+              <template #dropdown>
+                <t-dropdown-menu>
+                  <t-dropdown-item @click="emit('select', source)">编辑</t-dropdown-item>
+                  <t-dropdown-item class="danger" @click="emit('delete', source)"
+                    >删除</t-dropdown-item
+                  >
+                </t-dropdown-menu>
               </template>
-            </a-dropdown>
+            </t-dropdown>
           </div>
-        </template>
-      </a-list>
+        </t-list-item>
+      </t-list>
       <div v-else class="empty-list">暂无书源</div>
     </div>
   </div>
@@ -78,7 +83,7 @@ const emit = defineEmits<{
 
 .source-list-wrapper {
   flex: 1;
-  overflow: hidden;
+  overflow: auto;
   padding: 8px;
 }
 
@@ -86,9 +91,13 @@ const emit = defineEmits<{
   height: 100%;
 }
 
-.source-list :deep(.arco-list-item) {
+.source-list :deep(.t-list-item) {
   padding: 0 !important;
   background: transparent !important;
+}
+
+.source-list :deep(.t-list-item__content) {
+  width: 100%;
 }
 
 .source-item {

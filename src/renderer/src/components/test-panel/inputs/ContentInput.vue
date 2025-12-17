@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import { ChevronLeftIcon, ChevronRightIcon, FlashlightIcon } from 'tdesign-icons-vue-next'
+
 defineProps<{
   url: string
   loading: boolean
-  /** 当前页码 */
   page: number
-  /** 是否支持分页 */
   hasPagination: boolean
 }>()
 
@@ -18,35 +18,35 @@ const emit = defineEmits<{
 
 <template>
   <div class="content-input">
-    <a-input
-      :model-value="url"
+    <t-input
+      :value="url"
       placeholder="正文页URL"
       style="margin-bottom: 8px"
-      @update:model-value="emit('update:url', $event as string)"
+      @change="emit('update:url', $event as string)"
     />
 
-    <!-- 分页控件：仅当支持分页时显示 -->
     <div v-if="hasPagination" class="pagination-controls">
-      <a-button size="small" :disabled="page <= 1 || loading" @click="emit('prev-page')">
-        <icon-left />
+      <t-button size="small" :disabled="page <= 1 || loading" @click="emit('prev-page')">
+        <template #icon><chevron-left-icon /></template>
         上一页
-      </a-button>
+      </t-button>
       <span class="page-indicator">第 {{ page }} 页</span>
-      <a-button size="small" :disabled="loading" @click="emit('next-page')">
+      <t-button size="small" :disabled="loading" @click="emit('next-page')">
         下一页
-        <icon-right />
-      </a-button>
+        <template #suffix><chevron-right-icon /></template>
+      </t-button>
     </div>
 
-    <a-button
-      type="primary"
+    <t-button
+      theme="primary"
       size="small"
       :loading="loading"
       style="width: 100%"
       @click="emit('test')"
     >
-      <icon-thunderbolt /> 执行测试
-    </a-button>
+      <template #icon><flashlight-icon /></template>
+      执行测试
+    </t-button>
   </div>
 </template>
 

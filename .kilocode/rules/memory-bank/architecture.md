@@ -42,29 +42,15 @@ graph TB
 
 ```
 docs/                              # 用户文档
-├── rule-guide.md                  # 通用规则使用指南 (443行)
-└── universal-rule-spec.md         # 通用规则规范设计方案 (335行)
-
-scripts/                           # 开发测试脚本
-├── README.md                      # 脚本使用说明 (282行)
-├── test-conversion.ts             # 规则转换测试脚本 (405行)
-└── test-roundtrip.ts              # 往返一致性测试脚本
-
-test_rules/                        # 测试规则样例
-├── anyReader/                     # any-reader 格式规则
-│   ├── 17k小说.json
-│   └── 腾讯漫画.json
-├── legado/                        # Legado 格式规则
-│   ├── 3A小说.json
-│   └── UAA 文学.json
-└── universal/                     # 通用格式规则
-    └── 漫小肆韓漫.json
+├── rule-guide.md                  # 规则编写指南
+├── universal-rule-spec.md         # 规则规范设计方案
+└── universal-rule-schema.json     # JSON Schema 定义
 
 src/
 ├── main/                          # Electron 主进程
 │   ├── index.ts                   # 主进程入口，窗口管理
 │   ├── logger.ts                  # 日志记录模块
-│   └── proxy.ts                   # 网络代理/解析模块 (913行)
+│   └── proxy.ts                   # 网络代理/解析模块
 │
 ├── preload/                       # 预加载脚本
 │   ├── index.ts                   # 暴露 IPC API
@@ -83,7 +69,6 @@ src/
     │   ├── source-editor/         # 规则编辑器模块
     │   │   ├── SourceEditor.vue   # 编辑器主组件
     │   │   ├── EditorToolbar.vue  # 工具栏
-    │   │   ├── PlatformConfigSection.vue  # 平台配置区
     │   │   └── forms/             # 规则表单组件
     │   │       ├── BasicInfoForm.vue      # 基本信息
     │   │       ├── SearchRuleForm.vue     # 搜索规则
@@ -93,7 +78,7 @@ src/
     │   │       └── DetailRuleForm.vue     # 详情规则
     │   │
     │   └── test-panel/            # 测试面板模块
-    │       ├── TestPanel.vue      # 测试面板主组件 (820行)
+    │       ├── TestPanel.vue      # 测试面板主组件
     │       ├── composables/       # 测试逻辑 Composables
     │       │   ├── index.ts
     │       │   ├── useTestLogic.ts
@@ -101,7 +86,7 @@ src/
     │       │   ├── useChapterTest.ts
     │       │   ├── useContentTest.ts
     │       │   ├── useDiscoverTest.ts
-    │       │   └── useBatchTest.ts        # 批量测试逻辑 (220行)
+    │       │   └── useBatchTest.ts        # 批量测试逻辑
     │       ├── inputs/            # 测试输入组件
     │       │   ├── SearchInput.vue
     │       │   ├── ChapterInput.vue
@@ -109,41 +94,29 @@ src/
     │       │   └── DiscoverInput.vue
     │       └── results/           # 测试结果组件
     │           ├── ResultTabs.vue
-    │           ├── SearchResultList.vue
+    │           ├── BookResultList.vue     # 书籍结果（搜索/发现共用）
     │           ├── ChapterResultList.vue
-    │           ├── DiscoverResultList.vue
     │           └── ContentPreview.vue
     │
-    ├── converters/                # 规则格式转换器
-    │   ├── index.ts               # 转换器入口
-    │   ├── base.ts                # 基础接口定义
-    │   ├── any-reader.ts          # any-reader 转换器
-    │   ├── legado.ts              # Legado 转换器
-    │   ├── test-conversion.ts     # 转换器测试
-    │   └── expression/            # 表达式转换
-    │       ├── index.ts           # 表达式转换入口
-    │       ├── parser.ts          # 表达式解析器
-    │       ├── jsoup.ts           # JSOUP 语法转换
-    │       ├── variables.ts       # 变量转换
-    │       └── validator.ts       # 表达式验证器
+    ├── schemas/                   # JSON Schema 定义
+    │   └── universalRuleSchema.ts # 规则 Schema（Monaco 集成）
     │
     ├── stores/                    # Pinia 状态管理
     │   ├── sourceStore.ts         # 书源状态管理
     │   └── logStore.ts            # 日志状态管理
     │
     ├── types/                     # TypeScript 类型定义
-    │   ├── index.ts               # any-reader 规则类型
-    │   ├── universal.ts           # 通用规则类型 (325行)
-    │   ├── legado.ts              # Legado 规则类型
+    │   ├── index.ts               # 类型入口
+    │   ├── universal.ts           # 规则类型定义（184行）
     │   ├── expression.ts          # 表达式类型
     │   └── guards.ts              # 类型守卫
     │
     ├── router/                    # Vue Router 配置
-    │   └── index.ts               # 路由定义 (含 /batch-test)
+    │   └── index.ts               # 路由定义（含 /batch-test）
     │
     └── views/                     # 页面视图
-        ├── Home.vue               # 主页面 (604行)
-        └── BatchTest.vue          # 批量测试页面 (492行)
+        ├── Home.vue               # 主页面
+        └── BatchTest.vue          # 批量测试页面
 ```
 
 ## 核心模块详解
@@ -170,9 +143,9 @@ src/
 
 ```typescript
 // 类型层次结构
-UniversalRule (通用规则 - 超集)
+UniversalRule (书源规则)
 ├── 基本信息: id, name, host, icon, author, group, sort
-├── 内容类型: contentType (novel/manga/video/audio/rss)
+├── 内容类型: contentType (novel/manga)
 ├── 请求设置: userAgent, headers, loadJs
 ├── 规则配置
 │   ├── search?: UniversalSearchRule
@@ -180,52 +153,10 @@ UniversalRule (通用规则 - 超集)
 │   ├── chapter?: UniversalChapterRule
 │   ├── discover?: UniversalDiscoverRule
 │   └── content?: UniversalContentRule
-├── 平台特有字段
-│   ├── anyReader?: AnyReaderBaseFields
-│   └── legado?: LegadoBaseFields
-└── 元数据: _meta (sourceFormat, version, timestamps)
+└── 元数据: _meta (sourceFormat: universal, version, timestamps)
 ```
 
-### 3. 转换器架构
-
-```mermaid
-graph LR
-    subgraph Input
-        AR[any-reader Rule]
-        LG[Legado Rule]
-    end
-
-    subgraph Converters
-        ARC[AnyReaderConverter]
-        LGC[LegadoConverter]
-    end
-
-    subgraph Core
-        UR[UniversalRule]
-    end
-
-    AR --> ARC
-    LG --> LGC
-    ARC --> UR
-    LGC --> UR
-    UR --> ARC
-    UR --> LGC
-    ARC --> AR2[any-reader Rule]
-    LGC --> LG2[Legado Rule]
-```
-
-**转换器接口**：
-
-```typescript
-interface RuleConverter<T> {
-  toUniversal(rule: T, options?: ConvertOptions): UniversalRule
-  fromUniversal(rule: UniversalRule, options?: ConvertOptions): T
-  validate(rule: T): ValidationResult
-  detect(rule: unknown): rule is T
-}
-```
-
-### 4. 状态管理 - sourceStore
+### 3. 状态管理 - sourceStore
 
 ```typescript
 // 主要状态
@@ -238,8 +169,8 @@ searchQuery: string             // 搜索关键词
 loadSources()                   // 从 IndexedDB 加载
 saveSource(rule)                // 保存规则
 deleteSource(id)                // 删除规则
-importSources(json)             // 智能导入（自动检测格式）
-exportSources(format)           // 批量导出
+importSources(json)             // 导入规则
+exportSources()                 // 批量导出
 clearAllSources()               // 清空所有
 ```
 
@@ -249,7 +180,7 @@ clearAllSources()               // 清空所有
 - 内存缓存 + IndexedDB 双层存储
 - 按 sort 权重降序排列
 
-### 5. 测试面板 Composables
+### 4. 测试面板 Composables
 
 采用 Vue 3 Composition API 组织测试逻辑：
 
@@ -267,10 +198,10 @@ useSearchTest(rule) // 搜索测试
 useChapterTest(rule) // 章节测试
 useContentTest(rule) // 正文测试
 useDiscoverTest(rule) // 发现测试
-useBatchTest() // 批量测试（新增）
+useBatchTest() // 批量测试
 ```
 
-### 6. 批量测试模块（新增）
+### 5. 批量测试模块
 
 ```typescript
 // useBatchTest.ts - 批量测试 Composable
@@ -297,6 +228,20 @@ function useBatchTest() {
 }
 ```
 
+### 6. JSON Schema 集成
+
+```typescript
+// schemas/universalRuleSchema.ts
+// 用于 Monaco Editor 的 JSON 验证和智能提示
+
+export const universalRuleSchema = {
+  $schema: 'http://json-schema.org/draft-07/schema#',
+  title: 'Universal Rule',
+  description: '书源规则规范 - Scripting Reader 插件规则格式'
+  // ...完整 schema 定义
+}
+```
+
 ## 数据流
 
 ### 规则编辑流程
@@ -310,13 +255,13 @@ sequenceDiagram
     participant IDB as IndexedDB
 
     U->>SL: 选择书源
-    SL->>SE: handleSelectSource(rule)
+    SL->>SE: handleSelectSource - rule
     SE->>SE: 深拷贝规则
     U->>SE: 编辑规则
-    SE->>SE: handleRuleChange()
+    SE->>SE: handleRuleChange
     U->>SE: 点击保存
-    SE->>SS: saveSource(rule)
-    SS->>IDB: set(key, rule)
+    SE->>SS: saveSource - rule
+    SS->>IDB: set - key, rule
     SS->>SS: 更新内存缓存
 ```
 
@@ -341,7 +286,7 @@ sequenceDiagram
     API-->>TP: 显示结果
 ```
 
-### 批量测试流程（新增）
+### 批量测试流程
 
 ```mermaid
 sequenceDiagram
@@ -353,13 +298,13 @@ sequenceDiagram
 
     U->>BT: 输入关键词 + 选择书源
     U->>BT: 点击开始测试
-    BT->>UB: runBatchTest(sources, keyword)
+    BT->>UB: runBatchTest - sources, keyword
     loop 并发限制 3
         UB->>API: testSingleSource
         API->>M: IPC 请求
         M-->>API: 返回结果
         API-->>UB: BatchTestResult
-        UB->>BT: onUpdate(id, result)
+        UB->>BT: onUpdate - id, result
         BT->>BT: 更新 UI 状态
     end
     UB-->>BT: 测试完成
@@ -368,27 +313,27 @@ sequenceDiagram
 
 ## 关键设计决策
 
-### 1. 通用规则作为核心存储格式
+### 1. Universal 格式作为唯一存储格式
 
-- **原因**: 支持多格式无损转换
-- **实现**: 所有导入规则转换为 UniversalRule 存储
+- **原因**: 专注于 Scripting Reader 插件，简化架构
+- **实现**: 直接使用 Universal 格式存储和编辑
 
-### 2. 平台特有字段分组设计
-
-- **原因**: 便于 UI 分类展示和转换处理
-- **实现**: `anyReader` 和 `legado` 子对象内嵌
-
-### 3. Puppeteer 作为网络解析引擎
+### 2. Puppeteer 作为网络解析引擎
 
 - **原因**: 绕过 Cloudflare 等反爬机制
 - **实现**: 共享浏览器实例，自动重试机制
 
-### 4. 表达式统一前缀规范
+### 3. 表达式统一前缀规范
 
-- **原因**: 简化转换逻辑
+- **原因**: 简化解析逻辑
 - **实现**: 统一使用小写前缀 `@css:`, `@xpath:`, `@json:`, `@js:`
 
-### 5. 批量测试并发控制
+### 4. 批量测试并发控制
 
 - **原因**: 避免同时打开过多 Puppeteer 页面导致资源耗尽
 - **实现**: Promise 并发池，限制为 3 个并发任务
+
+### 5. JSON Schema 集成 Monaco Editor
+
+- **原因**: 提供智能提示和验证，降低规则编写门槛
+- **实现**: 自定义 schema 注入 Monaco 编辑器

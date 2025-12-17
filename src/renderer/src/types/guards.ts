@@ -1,14 +1,11 @@
 /**
  * 类型守卫函数
- * 用于运行时类型检查和验证
  */
 
 import type { UniversalRule } from './universal'
-import type { Rule } from './index'
-import type { LegadoRule } from './legado'
 
 /**
- * 检查是否为有效的 UniversalRule
+ * 检查是否为有效规则
  */
 export function isUniversalRule(obj: unknown): obj is UniversalRule {
   if (!obj || typeof obj !== 'object') return false
@@ -16,29 +13,6 @@ export function isUniversalRule(obj: unknown): obj is UniversalRule {
   return (
     typeof rule.id === 'string' && typeof rule.name === 'string' && typeof rule.host === 'string'
   )
-}
-
-/**
- * 检查是否为有效的 any-reader Rule
- */
-export function isAnyReaderRule(obj: unknown): obj is Rule {
-  if (!obj || typeof obj !== 'object') return false
-  const rule = obj as Record<string, unknown>
-  return (
-    typeof rule.id === 'string' &&
-    typeof rule.name === 'string' &&
-    typeof rule.host === 'string' &&
-    !('bookSourceUrl' in rule) // 排除 Legado 格式
-  )
-}
-
-/**
- * 检查是否为有效的 Legado Rule
- */
-export function isLegadoRule(obj: unknown): obj is LegadoRule {
-  if (!obj || typeof obj !== 'object') return false
-  const rule = obj as Record<string, unknown>
-  return typeof rule.bookSourceUrl === 'string' && typeof rule.bookSourceName === 'string'
 }
 
 /**
@@ -84,7 +58,7 @@ export function hasContentRule(rule: UniversalRule): boolean {
 }
 
 /**
- * 验证规则完整性，返回缺失的功能列表
+ * 验证规则完整性
  */
 export function validateRuleCompleteness(rule: UniversalRule): string[] {
   const missing: string[] = []

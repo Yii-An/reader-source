@@ -43,18 +43,18 @@ export function useChapterTest(rule: Ref<UniversalRule>): {
       const fullUrl = buildFullUrl(chapterUrlFinal, rule.value.host)
       logStore.info(`[章节] 请求 URL: ${fullUrl}`)
 
-      const data = await parseContent(fullUrl, rule.value.chapter?.list || '', {
+      const result = await parseContent(fullUrl, rule.value.chapter?.list || '', {
         name: rule.value.chapter?.name || '@text',
         url: rule.value.chapter?.result || 'a@href'
       })
 
-      results.value = data as ChapterResult[]
-      logStore.info(`[章节] ✅ 找到 ${data.length} 个章节`)
+      results.value = result.data as ChapterResult[]
+      logStore.info(`[章节] ✅ 找到 ${result.data.length} 个章节`)
 
       // 打印前5条章节
-      if (data.length > 0) {
-        logStore.debug(`[章节] 前${Math.min(5, data.length)}条:`)
-        ;(data as ChapterResult[]).slice(0, 5).forEach((item, idx) => {
+      if (result.data.length > 0) {
+        logStore.debug(`[章节] 前${Math.min(5, result.data.length)}条:`)
+        ;(result.data as ChapterResult[]).slice(0, 5).forEach((item, idx) => {
           logStore.debug(`  ${idx + 1}. ${item.name} → ${item.url?.substring(0, 50)}...`)
         })
       }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DeleteIcon, ChevronDownIcon } from 'tdesign-icons-vue-next'
 import type { LogItem } from '../types'
 
 defineProps<{
@@ -23,14 +24,14 @@ function formatTime(timestamp: number): string {
   <div class="log-panel-container">
     <div class="log-header">
       <span class="log-title">调试日志</span>
-      <a-space size="small">
-        <a-button size="mini" type="text" @click="emit('clear')">
-          <icon-delete />
-        </a-button>
-        <a-button size="mini" type="text" @click="emit('collapse')">
-          <icon-down />
-        </a-button>
-      </a-space>
+      <t-space size="small">
+        <t-button size="small" variant="text" @click="emit('clear')">
+          <template #icon><delete-icon /></template>
+        </t-button>
+        <t-button size="small" variant="text" @click="emit('collapse')">
+          <template #icon><chevron-down-icon /></template>
+        </t-button>
+      </t-space>
     </div>
     <div class="log-list">
       <div v-for="log in logs.slice(0, 50)" :key="log.id" class="log-item">
@@ -45,11 +46,16 @@ function formatTime(timestamp: number): string {
 
 <style scoped>
 .log-panel-container {
+  display: flex;
+  flex-direction: column;
+  height: 0;
+  flex: auto;
   background: var(--color-bg-3);
   border-top: 1px solid var(--color-border);
 }
 
 .log-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -63,7 +69,8 @@ function formatTime(timestamp: number): string {
 }
 
 .log-list {
-  max-height: 150px;
+  height: 0;
+  flex: auto;
   overflow-y: auto;
   padding: 8px;
 }
@@ -89,10 +96,22 @@ function formatTime(timestamp: number): string {
   text-transform: uppercase;
 }
 
-.log-level-info { background: rgba(137, 180, 250, 0.2); color: #89b4fa; }
-.log-level-debug { background: rgba(108, 112, 134, 0.2); color: #6c7086; }
-.log-level-warn { background: rgba(250, 179, 135, 0.2); color: #fab387; }
-.log-level-error { background: rgba(243, 139, 168, 0.2); color: #f38ba8; }
+.log-level-info {
+  background: rgba(137, 180, 250, 0.2);
+  color: #89b4fa;
+}
+.log-level-debug {
+  background: rgba(108, 112, 134, 0.2);
+  color: #6c7086;
+}
+.log-level-warn {
+  background: rgba(250, 179, 135, 0.2);
+  color: #fab387;
+}
+.log-level-error {
+  background: rgba(243, 139, 168, 0.2);
+  color: #f38ba8;
+}
 
 .log-message {
   flex: 1;

@@ -13,19 +13,20 @@ const emit = defineEmits<{
 
 <template>
   <div class="editor-toolbar">
-    <a-radio-group
-      :model-value="mode"
-      type="button"
+    <t-radio-group
+      :value="mode"
+      variant="default-filled"
       size="small"
-      @update:model-value="emit('update:mode', $event as 'code' | 'form')"
+      @change="emit('update:mode', $event as 'code' | 'form')"
     >
-      <a-radio value="code">代码</a-radio>
-      <a-radio value="form">表单</a-radio> </a-radio-group
-    ><span class="editor-info">
+      <t-radio-button value="code">代码</t-radio-button>
+      <t-radio-button value="form">表单</t-radio-button>
+    </t-radio-group>
+    <span class="editor-info">
       {{ ruleName }} - {{ ruleHost || '未设置' }}
-      <a-tag v-if="sourceFormat" size="small" color="arcoblue">
+      <t-tag v-if="sourceFormat" size="small" theme="primary">
         {{ sourceFormat }}
-      </a-tag>
+      </t-tag>
     </span>
   </div>
 </template>

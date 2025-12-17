@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import { SearchIcon, ChevronLeftIcon, ChevronRightIcon } from 'tdesign-icons-vue-next'
+
 defineProps<{
   keyword: string
   loading: boolean
-  /** 当前页码 */
   page: number
-  /** 是否支持分页（URL 包含 $page 变量） */
   hasPagination: boolean
 }>()
 
@@ -18,27 +18,30 @@ const emit = defineEmits<{
 
 <template>
   <div class="search-input">
-    <a-input-search
-      :model-value="keyword"
+    <t-input
+      :value="keyword"
       placeholder="输入搜索关键词..."
-      :loading="loading"
-      @update:model-value="emit('update:keyword', $event as string)"
-      @search="emit('test')"
+      @change="emit('update:keyword', $event as string)"
+      @enter="emit('test')"
     >
-      <template #button-default>测试</template>
-    </a-input-search>
+      <template #suffix-icon>
+        <search-icon />
+      </template>
+      <template #suffix>
+        <t-button size="small" :loading="loading" @click="emit('test')">测试</t-button>
+      </template>
+    </t-input>
 
-    <!-- 分页控件：仅当支持分页且已有搜索结果时显示 -->
     <div v-if="hasPagination" class="pagination-controls">
-      <a-button size="small" :disabled="page <= 1 || loading" @click="emit('prev-page')">
-        <icon-left />
+      <t-button size="small" :disabled="page <= 1 || loading" @click="emit('prev-page')">
+        <template #icon><chevron-left-icon /></template>
         上一页
-      </a-button>
+      </t-button>
       <span class="page-indicator">第 {{ page }} 页</span>
-      <a-button size="small" :disabled="loading" @click="emit('next-page')">
+      <t-button size="small" :disabled="loading" @click="emit('next-page')">
         下一页
-        <icon-right />
-      </a-button>
+        <template #suffix><chevron-right-icon /></template>
+      </t-button>
     </div>
   </div>
 </template>

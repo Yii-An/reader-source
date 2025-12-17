@@ -6,6 +6,7 @@ import { useTestLogic } from './useTestLogic'
 export interface DiscoverResult {
   name: string
   url: string
+  cover?: string
   author?: string
 }
 
@@ -76,7 +77,7 @@ export function useDiscoverTest(rule: Ref<UniversalRule>): {
       for (const item of rawList) {
         const parts = item.split('::').map((s) => s.trim())
         if (parts.length === 2) {
-          // 两段式规则：分类名::URL，每个分类独立成组（与 any-reader 一致）
+          // 两段式规则：分类名::URL，每个分类独立成组
           const [name, url] = parts
           groupMap.set(name, [{ name, url }])
         } else if (parts.length >= 3) {
@@ -167,20 +168,20 @@ export function useDiscoverTest(rule: Ref<UniversalRule>): {
       const fullUrl = buildFullUrl(discoverUrl, rule.value.host)
       logStore.info(`[发现] 请求 URL: ${fullUrl}`)
 
-      const data = await parseContent(fullUrl, rule.value.discover.list || '', {
+      const result = await parseContent(fullUrl, rule.value.discover.list || '', {
         name: rule.value.discover.name || '@text',
         cover: rule.value.discover.cover || '',
         author: rule.value.discover.author || '',
         url: rule.value.discover.result || 'a@href'
       })
 
-      results.value = data as DiscoverResult[]
-      logStore.info(`[发现] ✅ 找到 ${data.length} 个结果`)
+      results.value = result.data as DiscoverResult[]
+      logStore.info(`[发现] ✅ 找到 ${result.data.length} 个结果`)
 
       // 打印前3条结果
-      if (data.length > 0) {
-        logStore.debug(`[发现] 前${Math.min(3, data.length)}条结果:`)
-        ;(data as DiscoverResult[]).slice(0, 3).forEach((item, idx) => {
+      if (result.data.length > 0) {
+        logStore.debug(`[发现] 前${Math.min(3, result.data.length)}条结果:`)
+        ;(result.data as DiscoverResult[]).slice(0, 3).forEach((item, idx) => {
           logStore.debug(`  ${idx + 1}. ${item.name} | ${item.url?.substring(0, 50)}...`)
         })
       }

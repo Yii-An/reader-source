@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronLeftIcon, ChevronRightIcon, FlashlightIcon } from 'tdesign-icons-vue-next'
 import type { CategoryGroup } from '../composables'
 
 defineProps<{
@@ -7,9 +8,7 @@ defineProps<{
   selectedItemIndex: number
   loading: boolean
   categoriesLoading: boolean
-  /** 当前页码 */
   page: number
-  /** 是否支持分页（规则配置了 nextUrl） */
   hasPagination: boolean
 }>()
 
@@ -26,52 +25,53 @@ const emit = defineEmits<{
   <div class="discover-input">
     <div v-if="groups.length > 0" class="discover-category-panel">
       <div class="category-groups">
-        <a-button
+        <t-button
           v-for="(group, gIdx) in groups"
           :key="gIdx"
-          :type="selectedGroupIndex === gIdx ? 'primary' : 'text'"
+          :theme="selectedGroupIndex === gIdx ? 'primary' : 'default'"
+          variant="text"
           size="small"
           @click="emit('select-group', gIdx)"
         >
           {{ group.name }}
-        </a-button>
+        </t-button>
       </div>
       <div v-if="groups[selectedGroupIndex]?.items.length > 1" class="category-items">
-        <a-button
+        <t-button
           v-for="(item, iIdx) in groups[selectedGroupIndex].items"
           :key="iIdx"
-          :type="selectedItemIndex === iIdx ? 'primary' : 'text'"
+          :theme="selectedItemIndex === iIdx ? 'primary' : 'default'"
+          variant="text"
           size="small"
           @click="emit('select-item', iIdx)"
         >
           {{ item.name }}
-        </a-button>
+        </t-button>
       </div>
     </div>
 
-    <!-- 分页控件：仅当规则支持分页且已加载分类时显示 -->
     <div v-if="groups.length > 0 && hasPagination" class="pagination-controls">
-      <a-button size="small" :disabled="page <= 1 || loading" @click="emit('prev-page')">
-        <icon-left />
+      <t-button size="small" :disabled="page <= 1 || loading" @click="emit('prev-page')">
+        <template #icon><chevron-left-icon /></template>
         上一页
-      </a-button>
+      </t-button>
       <span class="page-indicator">第 {{ page }} 页</span>
-      <a-button size="small" :disabled="loading" @click="emit('next-page')">
+      <t-button size="small" :disabled="loading" @click="emit('next-page')">
         下一页
-        <icon-right />
-      </a-button>
+        <template #suffix><chevron-right-icon /></template>
+      </t-button>
     </div>
 
-    <a-button
-      type="primary"
+    <t-button
+      theme="primary"
       size="small"
       :loading="loading || categoriesLoading"
       style="margin-top: 8px; width: 100%"
       @click="emit('test')"
     >
-      <icon-thunderbolt />
+      <template #icon><flashlight-icon /></template>
       {{ groups.length > 0 ? '刷新列表' : '加载分类' }}
-    </a-button>
+    </t-button>
   </div>
 </template>
 

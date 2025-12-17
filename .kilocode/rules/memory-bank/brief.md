@@ -2,14 +2,13 @@
 
 ## 项目概述
 
-**Reader Source** 是一个跨平台的阅读器书源编辑器，用于管理和编辑阅读类应用（如 Legado「阅读」、any-reader 等）的书源规则。该工具提供可视化的规则编辑界面，支持多种书源格式的导入、转换和导出。
+**Reader Source** 是 iOS [Scripting](https://scripting.fun/) 阅读插件的书源编辑器，用于创建和编辑书源规则。
 
 ## 核心目标
 
-1. **统一书源管理** - 提供一个通用的书源编辑平台，兼容主流阅读器格式
-2. **格式互转** - 实现 any-reader 和 Legado 书源格式的双向转换
-3. **可视化编辑** - 通过表单和代码编辑器简化规则创建和维护
-4. **规则测试** - 内置测试面板验证书源规则的正确性
+1. **书源编辑** - 提供可视化的规则编辑界面
+2. **规则测试** - 内置测试面板验证规则正确性
+3. **批量测试** - 多书源并发测试
 
 ## 技术栈
 
@@ -28,79 +27,41 @@
 
 ```
 docs/               # 用户文档
-├── rule-guide.md         # 通用规则使用指南
-└── universal-rule-spec.md # 通用规则规范设计方案
-
-scripts/            # 开发测试脚本
-├── README.md             # 脚本使用说明
-├── test-conversion.ts    # 规则转换测试脚本
-└── test-roundtrip.ts     # 往返一致性测试脚本
-
-test_rules/         # 测试规则样例
-├── anyReader/            # any-reader 格式规则
-├── legado/               # Legado 格式规则
-└── universal/            # 通用格式规则
+├── rule-guide.md         # 规则使用指南
+├── universal-rule-spec.md # 规则规范
+└── universal-rule-schema.json # JSON Schema
 
 src/
 ├── main/           # Electron 主进程
-│   ├── index.ts    # 主进程入口
-│   ├── logger.ts   # 日志模块
-│   └── proxy.ts    # 网络代理模块
 ├── preload/        # 预加载脚本
 └── renderer/src/   # Vue 渲染进程
     ├── components/ # UI 组件
     │   ├── source-editor/  # 规则编辑器
     │   └── test-panel/     # 测试面板
-    │       └── composables/useBatchTest.ts  # 批量测试逻辑
-    ├── converters/ # 规则格式转换器
-    │   ├── any-reader.ts   # any-reader 转换
-    │   ├── legado.ts       # Legado 转换
-    │   └── expression/     # 表达式解析
+    ├── schemas/    # JSON Schema 定义
     ├── stores/     # Pinia 状态管理
     │   ├── sourceStore.ts  # 书源管理
     │   └── logStore.ts     # 日志管理
     ├── types/      # TypeScript 类型定义
-    │   ├── universal.ts    # 通用规则类型
-    │   ├── legado.ts       # Legado 规则类型
-    │   └── index.ts        # any-reader 规则类型
+    │   └── universal.ts    # 规则类型
     ├── router/     # 路由配置
     └── views/      # 页面视图
         ├── Home.vue        # 主页面
         └── BatchTest.vue   # 批量测试页面
 ```
 
-## 目标用户
-
-- 阅读 App 用户（需要自定义书源）
-- 书源规则开发者
-- 阅读器社区维护者
-
-## 支持的书源格式
-
-| 格式           | 描述                                              |
-| -------------- | ------------------------------------------------- |
-| **any-reader** | 通用阅读器格式，支持小说、漫画、视频、音频、RSS   |
-| **Legado**     | 「阅读」App 书源格式，广泛使用于 Android 阅读社区 |
-| **Universal**  | 项目定义的通用规则格式，作为两种格式的超集        |
-
-## 主要功能
-
-- 📋 书源列表管理（导入/导出/删除）
-- ✏️ 可视化规则编辑器
-- 🔄 多格式转换（any-reader ↔ Universal ↔ Legado）
-- 🧪 规则测试面板（搜索/发现/章节/内容）
-- ⚡ **批量测试**（多书源并发搜索测试）
-- 📝 Monaco 代码编辑器支持
-- 💾 本地数据持久化（IndexedDB）
-- 🔧 自动化转换测试脚本
-
 ## 支持的内容类型
 
 - 📖 小说/文字 (novel)
 - 📚 漫画/图片 (manga)
-- 🎬 视频 (video)
-- 🎵 音频/有声书 (audio)
-- 📰 RSS 订阅 (rss)
+
+## 主要功能
+
+- ✏️ 可视化规则编辑器
+- 🧪 规则测试面板（搜索/发现/章节/内容）
+- ⚡ 批量测试（多书源并发搜索测试）
+- 📝 Monaco 代码编辑器支持（含 JSON Schema 智能提示）
+- 💾 本地数据持久化（IndexedDB）
 
 ## 开发命令
 
@@ -119,9 +80,6 @@ npm run build:linux  # Linux
 # 代码检查
 npm run lint
 npm run typecheck
-
-# 运行转换测试脚本
-npx tsx scripts/test-conversion.ts
 ```
 
 ## 项目状态

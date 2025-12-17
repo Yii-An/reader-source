@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import type { UniversalSearchRule } from '../../../types/universal'
-import PlatformConfigSection from '../PlatformConfigSection.vue'
 
 const props = defineProps<{
   rule: UniversalSearchRule | undefined
-  platformTab: 'any-reader' | 'legado'
 }>()
 
 const emit = defineEmits<{
   'update:rule': [rule: UniversalSearchRule]
-  'update:platformTab': [tab: 'any-reader' | 'legado']
 }>()
 
 function updateField<K extends keyof UniversalSearchRule>(
@@ -19,108 +16,82 @@ function updateField<K extends keyof UniversalSearchRule>(
   if (!props.rule) return
   emit('update:rule', { ...props.rule, [field]: value })
 }
-
-function updateAnyReaderField(field: string, value: unknown): void {
-  if (!props.rule) return
-  const anyReader = { ...props.rule.anyReader, [field]: value }
-  emit('update:rule', { ...props.rule, anyReader })
-}
 </script>
 
 <template>
   <div v-if="rule" class="search-rule-form">
-    <a-form-item label="启用搜索">
-      <a-switch
-        :model-value="rule.enabled"
-        @update:model-value="updateField('enabled', $event as boolean)"
-      />
-    </a-form-item>
-    <a-form-item label="搜索URL">
-      <a-input
-        :model-value="rule.url"
+    <t-form-item label="启用搜索 (enabled)">
+      <t-switch :value="rule.enabled" @change="updateField('enabled', $event as boolean)" />
+    </t-form-item>
+    <t-form-item label="搜索URL (url)">
+      <t-input
+        :value="rule.url"
         placeholder="{{keyword}} 为搜索关键词, {{page}} 为页码"
-        @update:model-value="updateField('url', $event as string)"
+        @change="updateField('url', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="搜索列表规则">
-      <a-input
-        :model-value="rule.list"
+    </t-form-item>
+    <t-form-item label="搜索列表规则 (list)">
+      <t-input
+        :value="rule.list"
         placeholder="@css: 或 @xpath: 选择器"
-        @update:model-value="updateField('list', $event as string)"
+        @change="updateField('list', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="标题规则">
-      <a-input
-        :model-value="rule.name"
+    </t-form-item>
+    <t-form-item label="标题规则 (name)">
+      <t-input
+        :value="rule.name"
         placeholder="@css:.title@text"
-        @update:model-value="updateField('name', $event as string)"
+        @change="updateField('name', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="封面规则">
-      <a-input
-        :model-value="rule.cover"
+    </t-form-item>
+    <t-form-item label="封面规则 (cover)">
+      <t-input
+        :value="rule.cover"
         placeholder="@css:img@src"
-        @update:model-value="updateField('cover', $event as string)"
+        @change="updateField('cover', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="作者规则">
-      <a-input
-        :model-value="rule.author"
+    </t-form-item>
+    <t-form-item label="作者规则 (author)">
+      <t-input
+        :value="rule.author"
         placeholder="@css:.author@text"
-        @update:model-value="updateField('author', $event as string)"
+        @change="updateField('author', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="描述规则">
-      <a-input
-        :model-value="rule.description"
+    </t-form-item>
+    <t-form-item label="描述规则 (description)">
+      <t-input
+        :value="rule.description"
         placeholder="@css:.intro@text"
-        @update:model-value="updateField('description', $event as string)"
+        @change="updateField('description', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="最新章节规则">
-      <a-input
-        :model-value="rule.latestChapter"
+    </t-form-item>
+    <t-form-item label="最新章节规则 (latestChapter)">
+      <t-input
+        :value="rule.latestChapter"
         placeholder="@css:.latest@text"
-        @update:model-value="updateField('latestChapter', $event as string)"
+        @change="updateField('latestChapter', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="字数规则">
-      <a-input
-        :model-value="rule.wordCount"
+    </t-form-item>
+    <t-form-item label="字数规则 (wordCount)">
+      <t-input
+        :value="rule.wordCount"
         placeholder="@css:.word-count@text"
-        @update:model-value="updateField('wordCount', $event as string)"
+        @change="updateField('wordCount', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="标签规则">
-      <a-input
-        :model-value="rule.tags"
+    </t-form-item>
+    <t-form-item label="标签规则 (tags)">
+      <t-input
+        :value="rule.tags"
         placeholder="@css:.tags@text"
-        @update:model-value="updateField('tags', $event as string)"
+        @change="updateField('tags', $event as string)"
       />
-    </a-form-item>
-    <a-form-item label="结果URL规则">
-      <a-input
-        :model-value="rule.result"
+    </t-form-item>
+    <t-form-item label="结果URL规则 (result)">
+      <t-input
+        :value="rule.result"
         placeholder="@css:a@href"
-        @update:model-value="updateField('result', $event as string)"
+        @change="updateField('result', $event as string)"
       />
-    </a-form-item>
-
-    <PlatformConfigSection
-      :active-platform="platformTab"
-      @update:active-platform="emit('update:platformTab', $event)"
-    >
-      <template #any-reader>
-        <div v-if="rule.anyReader">
-          <a-form-item label="搜索项模板">
-            <a-textarea
-              :model-value="rule.anyReader.items"
-              placeholder="搜索项模板"
-              :auto-size="{ minRows: 2 }"
-              @update:model-value="updateAnyReaderField('items', $event)"
-            />
-          </a-form-item>
-        </div> </template
-    ></PlatformConfigSection>
+    </t-form-item>
   </div>
 </template>

@@ -1,13 +1,35 @@
+<!--
+  @file BookResultList.vue - 通用书籍结果列表组件
+  @description 搜索和发现页面共用的结果列表组件，支持：
+               1. 封面图片显示（可选，通过 showCover prop 控制）
+               2. 封面图片代理（绕过防盗链）
+               3. 作者和链接信息展示
+               4. 点击选择事件
+-->
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
-import type { SearchResult } from '../composables'
 
-const props = defineProps<{
-  results: SearchResult[]
-}>()
+/** 通用书籍/结果项类型 - 搜索和发现共用 */
+export interface BookResultItem {
+  name: string
+  url: string
+  cover?: string
+  author?: string
+}
+
+const props = withDefaults(
+  defineProps<{
+    results: BookResultItem[]
+    /** 是否显示封面图片，默认 true */
+    showCover?: boolean
+  }>(),
+  {
+    showCover: true
+  }
+)
 
 const emit = defineEmits<{
-  select: [item: SearchResult]
+  select: [item: BookResultItem]
 }>()
 
 /** 代理后的封面图片 URL 缓存 */
@@ -29,13 +51,14 @@ async function proxyCover(url: string): Promise<void> {
 }
 
 /** 获取封面图片 URL */
-function getCoverUrl(item: SearchResult): string | undefined {
+function getCoverUrl(item: BookResultItem): string | undefined {
   if (!item.cover) return undefined
   return proxiedCovers.value.get(item.cover) || item.cover
 }
 
 /** 代理所有封面 */
 function proxyAllCovers(): void {
+  if (!props.showCover) return
   props.results.forEach((item) => {
     if (item.cover) {
       proxyCover(item.cover)
@@ -63,14 +86,15 @@ watch(
       class="result-item"
       @click="emit('select', item)"
     >
-      <!-- 封面图片 -->
-      <div class="result-cover">
+      <!-- 封面图片（可选） -->
+      <div v-if="showCover" class="result-cover">
         <img v-if="item.cover" :src="getCoverUrl(item)" alt="cover" class="cover-img" />
         <div v-else class="cover-placeholder">
           <icon-image />
           <span>暂无封面</span>
         </div>
       </div>
+
       <div class="result-info">
         <div class="result-name">{{ item.name }}</div>
         <div class="result-url">作者：{{ item.author || '未知作者' }}</div>
@@ -85,10 +109,12 @@ watch(
 .result-list {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 8px;
 }
 
 .result-item {
+  width: calc(100% - 8px);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -96,15 +122,15 @@ watch(
   padding-left: 14px;
   background: var(--color-bg-3);
   border-radius: 8px;
-  border-left: 3px solid rgb(var(--primary-6));
+  box-sizing: border-box;
+  border-left: 3px solid transparent;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .result-item:hover {
   background: var(--color-fill-3);
-  transform: translateX(4px);
-  border-left-color: rgb(var(--primary-5));
+  border-left-color: var(--color-primary);
 }
 
 .result-cover {
@@ -168,6 +194,6 @@ watch(
 
 .result-item:hover .result-arrow {
   transform: translateX(4px);
-  color: rgb(var(--primary-6));
+  color: var(--color-primary);
 }
 </style>

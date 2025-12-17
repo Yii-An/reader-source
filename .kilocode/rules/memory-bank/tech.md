@@ -20,11 +20,12 @@
 
 ### UI 组件与编辑器
 
-| 技术                  | 版本    | 用途                   |
-| --------------------- | ------- | ---------------------- |
-| Arco Design Vue       | ^2.57.0 | 字节跳动 UI 组件库     |
-| Monaco Editor         | ^0.55.1 | VS Code 代码编辑器内核 |
-| @monaco-editor/loader | ^1.7.0  | Monaco Editor 加载器   |
+| 技术                   | 版本    | 用途                   |
+| ---------------------- | ------- | ---------------------- |
+| TDesign Vue Next       | ^1.10.0 | 腾讯 UI 组件库         |
+| TDesign Icons Vue Next | ^0.3.0  | TDesign 图标库         |
+| Monaco Editor          | ^0.55.1 | VS Code 代码编辑器内核 |
+| @monaco-editor/loader  | ^1.7.0  | Monaco Editor 加载器   |
 
 ### 状态管理与路由
 
@@ -84,9 +85,6 @@ npm run typecheck
 
 # 格式化代码
 npm run format
-
-# 运行规则转换测试脚本
-npx tsx scripts/test-conversion.ts
 ```
 
 ### 构建命令

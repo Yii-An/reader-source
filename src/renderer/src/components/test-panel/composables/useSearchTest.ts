@@ -45,20 +45,20 @@ export function useSearchTest(rule: Ref<UniversalRule>): {
       const fullUrl = buildFullUrl(searchUrl, rule.value.host)
       logStore.info(`[搜索] 请求 URL: ${fullUrl}`)
 
-      const data = await parseContent(fullUrl, rule.value.search.list || '', {
+      const result = await parseContent(fullUrl, rule.value.search.list || '', {
         name: rule.value.search.name || '@text',
         cover: rule.value.search.cover || '',
         author: rule.value.search.author || '',
         url: rule.value.search.result || 'a@href'
       })
 
-      results.value = data as SearchResult[]
-      logStore.info(`[搜索] ✅ 找到 ${data.length} 个结果`)
+      results.value = result.data as SearchResult[]
+      logStore.info(`[搜索] ✅ 找到 ${result.data.length} 个结果`)
 
       // 打印前3条结果详情
-      if (data.length > 0) {
-        logStore.debug(`[搜索] 前${Math.min(3, data.length)}条结果:`)
-        ;(data as SearchResult[]).slice(0, 3).forEach((item, idx) => {
+      if (result.data.length > 0) {
+        logStore.debug(`[搜索] 前${Math.min(3, result.data.length)}条结果:`)
+        ;(result.data as SearchResult[]).slice(0, 3).forEach((item, idx) => {
           logStore.debug(`  ${idx + 1}. ${item.name} | ${item.url?.substring(0, 60)}...`)
         })
       }

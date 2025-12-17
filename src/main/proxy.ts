@@ -561,8 +561,16 @@ function handleParse(request: ParseRequest): ParseResponse {
   }
 }
 
+// 支持的简写属性关键词
+const SHORTHAND_ATTRS = ['text', 'href', 'src']
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractValue($context: any, rule: string, host?: string, fieldName?: string): string {
+  // 空规则直接返回空字符串
+  if (!rule || !rule.trim()) {
+    return ''
+  }
+
   const logPrefix = fieldName ? `[Parse:${fieldName}]` : '[Parse:extractValue]'
 
   // 解析 ##pattern##replacement 正则替换语法
@@ -582,7 +590,11 @@ function extractValue($context: any, rule: string, host?: string, fieldName?: st
   let selector = ''
   let attr = 'text'
 
-  if (rule.startsWith('@')) {
+  // 检查是否为简写属性关键词（text, href, src）
+  if (SHORTHAND_ATTRS.includes(rule)) {
+    attr = rule
+    selector = ''
+  } else if (rule.startsWith('@')) {
     attr = rule.slice(1)
   } else if (atIndex > 0) {
     selector = rule.substring(0, atIndex).trim()
@@ -669,6 +681,11 @@ function extractValue($context: any, rule: string, host?: string, fieldName?: st
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractValueSilent($context: any, rule: string, host?: string): string {
+  // 空规则直接返回空字符串
+  if (!rule || !rule.trim()) {
+    return ''
+  }
+
   // 解析 ##pattern##replacement 正则替换语法
   let replacePattern: string | null = null
   let replaceWith: string | null = null
@@ -683,7 +700,11 @@ function extractValueSilent($context: any, rule: string, host?: string): string 
   let selector = ''
   let attr = 'text'
 
-  if (rule.startsWith('@')) {
+  // 检查是否为简写属性关键词（text, href, src）
+  if (SHORTHAND_ATTRS.includes(rule)) {
+    attr = rule
+    selector = ''
+  } else if (rule.startsWith('@')) {
     attr = rule.slice(1)
   } else if (atIndex > 0) {
     selector = rule.substring(0, atIndex).trim()
@@ -1045,12 +1066,19 @@ async function handleParseInPage(request: ParseInPageRequest): Promise<ParseResp
           }
         }
 
-        // 解析规则：selector@attr 或 @attr
+        // 支持的简写属性关键词
+        const SHORTHAND_ATTRS = ['text', 'href', 'src']
+
+        // 解析规则：selector@attr 或 @attr 或简写关键词
         const atIndex = cleanRule.lastIndexOf('@')
         let selector = ''
         let attr = 'text'
 
-        if (cleanRule.startsWith('@')) {
+        // 检查是否为简写属性关键词（text, href, src）
+        if (SHORTHAND_ATTRS.includes(cleanRule)) {
+          attr = cleanRule
+          selector = ''
+        } else if (cleanRule.startsWith('@')) {
           attr = cleanRule.slice(1)
         } else if (atIndex > 0) {
           selector = cleanRule.substring(0, atIndex).trim()

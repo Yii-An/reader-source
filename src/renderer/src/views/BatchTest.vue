@@ -1,10 +1,10 @@
 <!--
   @file BatchTest.vue - 批量测试页面
-  @description 批量测试独立页面，支持对多个书源同时执行搜索测试，并查看详细结果
 -->
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { ChevronLeftIcon, LoadingIcon } from 'tdesign-icons-vue-next'
 import { useSourceStore } from '../stores/sourceStore'
 import { useLogStore } from '../stores/logStore'
 import {
@@ -14,33 +14,23 @@ import {
 import ResultTabs from '../components/test-panel/results/ResultTabs.vue'
 import type { UniversalRule } from '../types/universal'
 
-// ==================== Store ====================
 const router = useRouter()
 const sourceStore = useSourceStore()
 const logStore = useLogStore()
 const { runBatchTest } = useBatchTest()
 
-// ==================== 状态 ====================
-/** 搜索关键词 */
 const keyword = ref('')
-/** 选中的书源 ID 列表 */
 const selectedSourceIds = ref<string[]>([])
-/** 测试结果映射 */
 const testResults = ref<Map<string, BatchTestResult>>(new Map())
-/** 是否正在测试 */
 const testing = ref(false)
-/** 当前选中查看详情的书源 ID */
 const selectedDetailId = ref<string | null>(null)
 
-// ==================== 计算属性 ====================
-/** 是否全选 */
 const isAllSelected = computed(() => {
   return (
     sourceStore.sources.length > 0 && selectedSourceIds.value.length === sourceStore.sources.length
   )
 })
 
-/** 测试统计 */
 const testStats = computed(() => {
   let success = 0
   let error = 0
@@ -61,29 +51,22 @@ const testStats = computed(() => {
   return { success, error, pending, totalCount }
 })
 
-/** 当前选中的书源 */
 const selectedSource = computed<UniversalRule | undefined>(() => {
   if (!selectedDetailId.value) return undefined
   return sourceStore.sources.find((s) => s.id === selectedDetailId.value)
 })
 
-/** 当前选中书源的测试结果 */
 const selectedResult = computed<BatchTestResult | undefined>(() => {
   if (!selectedDetailId.value) return undefined
   return testResults.value.get(selectedDetailId.value)
 })
 
-// ==================== 生命周期 ====================
-// 初始化选中所有书源
 selectedSourceIds.value = sourceStore.sources.map((s) => s.id)
 
-// ==================== 方法 ====================
-/** 返回主页 */
 function goBack(): void {
   router.push('/')
 }
 
-/** 切换全选 */
 function toggleSelectAll(): void {
   if (isAllSelected.value) {
     selectedSourceIds.value = []
@@ -92,7 +75,6 @@ function toggleSelectAll(): void {
   }
 }
 
-/** 切换单个书源选中状态 */
 function toggleSource(id: string): void {
   const index = selectedSourceIds.value.indexOf(id)
   if (index > -1) {
@@ -102,12 +84,10 @@ function toggleSource(id: string): void {
   }
 }
 
-/** 选中书源查看详情 */
 function selectSourceDetail(id: string): void {
   selectedDetailId.value = id
 }
 
-/** 执行批量测试 */
 async function handleTest(): Promise<void> {
   if (!keyword.value.trim()) {
     logStore.warn('请输入搜索关键词')
@@ -136,7 +116,6 @@ async function handleTest(): Promise<void> {
   )
 }
 
-/** 获取书源的结果状态文本 */
 function getResultStatus(source: UniversalRule): { text: string; type: string } {
   const result = testResults.value.get(source.id)
   if (!result) return { text: '', type: '' }
@@ -158,30 +137,32 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
 
 <template>
   <div class="batch-test-page">
-    <!-- 顶部工具栏 -->
     <div class="page-header">
       <div class="header-left">
-        <a-button @click="goBack"> <icon-left /> 返回 </a-button>
-        <a-divider direction="vertical" />
+        <t-button @click="goBack">
+          <template #icon><chevron-left-icon /></template>
+          返回
+        </t-button>
+        <t-divider layout="vertical" />
         <span class="page-title">批量测试</span>
       </div>
       <div class="header-center">
-        <a-input
+        <t-input
           v-model="keyword"
           placeholder="输入搜索关键词"
           :disabled="testing"
           style="width: 300px"
-          @keyup.enter="handleTest"
+          @enter="handleTest"
         />
-        <a-button
-          type="primary"
+        <t-button
+          theme="primary"
           :loading="testing"
           :disabled="!keyword.trim() || selectedSourceIds.length === 0"
           style="margin-left: 12px"
           @click="handleTest"
         >
           {{ testing ? '测试中...' : '开始测试' }}
-        </a-button>
+        </t-button>
       </div>
       <div class="header-right">
         <div v-if="testResults.size > 0" class="test-stats">
@@ -192,19 +173,17 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
       </div>
     </div>
 
-    <!-- 主体区域 -->
     <div class="page-body">
-      <!-- 左侧书源列表 -->
       <div class="source-list-panel">
         <div class="panel-header">
-          <a-checkbox
-            :model-value="isAllSelected"
+          <t-checkbox
+            :checked="isAllSelected"
             :indeterminate="selectedSourceIds.length > 0 && !isAllSelected"
             :disabled="testing"
             @change="toggleSelectAll"
           >
             全选 ({{ selectedSourceIds.length }}/{{ sourceStore.sources.length }})
-          </a-checkbox>
+          </t-checkbox>
         </div>
         <div class="source-list">
           <div
@@ -219,8 +198,8 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
             }"
             @click="selectSourceDetail(source.id)"
           >
-            <a-checkbox
-              :model-value="selectedSourceIds.includes(source.id)"
+            <t-checkbox
+              :checked="selectedSourceIds.includes(source.id)"
               :disabled="testing"
               @click.stop
               @change="toggleSource(source.id)"
@@ -230,14 +209,13 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
               <div class="source-host">{{ source.host }}</div>
             </div>
             <div class="source-status" :class="getResultStatus(source).type">
-              <icon-loading v-if="testResults.get(source.id)?.status === 'running'" spin />
+              <loading-icon v-if="testResults.get(source.id)?.status === 'running'" />
               <span>{{ getResultStatus(source).text }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 右侧详情面板 -->
       <div class="detail-panel">
         <template v-if="selectedSource && selectedResult">
           <div class="detail-header">
@@ -254,11 +232,11 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
               />
             </template>
             <template v-else-if="selectedResult.status === 'error'">
-              <a-result status="error" :title="selectedResult.error" />
+              <t-result theme="error" :title="selectedResult.error" />
             </template>
             <template v-else-if="selectedResult.status === 'running'">
               <div class="loading-state">
-                <a-spin size="32" />
+                <t-loading size="32px" />
                 <span>正在测试...</span>
               </div>
             </template>
@@ -270,7 +248,7 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
           </div>
         </template>
         <template v-else>
-          <a-empty description="选择左侧书源查看详细结果" />
+          <t-empty description="选择左侧书源查看详细结果" />
         </template>
       </div>
     </div>
@@ -483,7 +461,6 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
   color: var(--color-text-3);
 }
 
-/* ResultTabs 适配 */
 .detail-content :deep(.result-display-tabs) {
   margin-top: 0;
   padding-top: 0;

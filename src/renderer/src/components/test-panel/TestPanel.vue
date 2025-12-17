@@ -502,7 +502,7 @@ async function loadDiscoverCategories(): Promise<void> {
     for (const item of rawList) {
       const parts = item.split('::').map((s) => s.trim())
       if (parts.length === 2) {
-        // 两段式规则：分类名::URL，每个分类独立成组（与 any-reader 一致）
+        // 两段式规则：分类名::URL，每个分类独立成组
         const [name, url] = parts
         groupMap.set(name, [{ name, url }])
       } else if (parts.length >= 3) {
@@ -842,18 +842,18 @@ function selectResult(item: { name: string; url: string }): void {
   <div class="test-panel-container">
     <!-- Header -->
     <div class="test-header">
-      <a-radio-group v-model="testType" type="button" size="small">
-        <a-radio value="search">搜索</a-radio>
-        <a-radio value="discover">发现</a-radio>
-        <a-radio value="chapter">章节</a-radio>
-        <a-radio value="content">正文</a-radio>
-      </a-radio-group>
+      <t-radio-group v-model="testType" variant="default-filled" size="small">
+        <t-radio-button value="search">搜索</t-radio-button>
+        <t-radio-button value="discover">发现</t-radio-button>
+        <t-radio-button value="chapter">章节</t-radio-button>
+        <t-radio-button value="content">正文</t-radio-button>
+      </t-radio-group>
     </div>
 
     <!-- Content -->
     <div class="test-content">
       <!-- Loading overlay -->
-      <div v-if="testing" class="loading-overlay"><a-spin size="large" tip="测试中..." /></div>
+      <div v-if="testing" class="loading-overlay"><t-loading size="large" text="测试中..." /></div>
 
       <!-- Input area -->
       <div class="test-input">
@@ -917,9 +917,7 @@ function selectResult(item: { name: string; url: string }): void {
 
       <!-- Empty state -->
       <div v-if="!testing && !hasResults" class="empty-state">
-        <div class="empty-state-icon">
-          <icon-experiment />
-        </div>
+        <div class="empty-state-icon">🧪</div>
         <div class="empty-state-text">输入测试参数后点击测试按钮</div>
       </div>
     </div>
