@@ -644,7 +644,7 @@ async function selectGroup(gIdx: number): Promise<void> {
   // 切换分组时重置页码和下一页链接
   discoverPage.value = 1
   discoverNextUrl.value = ''
-  await runDiscoverTest()
+  await runTest()
 }
 
 /**
@@ -658,7 +658,7 @@ async function selectItem(iIdx: number): Promise<void> {
   // 切换分类时重置页码和下一页链接
   discoverPage.value = 1
   discoverNextUrl.value = ''
-  await runDiscoverTest()
+  await runTest()
 }
 
 /**
