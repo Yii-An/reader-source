@@ -952,7 +952,7 @@ function selectResult(item: { name: string; url: string }): void {
     <!-- Content -->
     <div class="test-content">
       <!-- Loading overlay -->
-      <div v-if="testing" class="loading-overlay"><t-loading size="large" text="测试中..." /></div>
+      <div v-if="testing" class="loading-overlay"><t-loading size="large" /></div>
 
       <!-- Input area -->
       <div class="test-input">
