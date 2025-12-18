@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeftIcon, ChevronRightIcon, FlashlightIcon } from 'tdesign-icons-vue-next'
+import { FlashlightIcon } from 'tdesign-icons-vue-next'
 import type { CategoryGroup } from '../composables'
 
 defineProps<{
@@ -8,15 +8,11 @@ defineProps<{
   selectedItemIndex: number
   loading: boolean
   categoriesLoading: boolean
-  page: number
-  hasPagination: boolean
 }>()
 
 const emit = defineEmits<{
   'select-group': [index: number]
   'select-item': [index: number]
-  'prev-page': []
-  'next-page': []
   test: []
 }>()
 </script>
@@ -54,18 +50,6 @@ const emit = defineEmits<{
       </div>
     </div>
 
-    <div v-if="groups.length > 0 && hasPagination" class="pagination-controls">
-      <t-button size="small" :disabled="page <= 1 || loading" @click="emit('prev-page')">
-        <template #icon><chevron-left-icon /></template>
-        上一页
-      </t-button>
-      <span class="page-indicator">第 {{ page }} 页</span>
-      <t-button size="small" :disabled="loading" @click="emit('next-page')">
-        下一页
-        <template #suffix><chevron-right-icon /></template>
-      </t-button>
-    </div>
-
     <t-button
       theme="primary"
       size="small"
@@ -96,23 +80,5 @@ const emit = defineEmits<{
 .category-items {
   display: flex;
   flex-wrap: wrap;
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 8px;
-  background: var(--color-bg-2);
-  border-radius: 6px;
-  margin-bottom: 8px;
-}
-
-.page-indicator {
-  font-size: 12px;
-  color: var(--color-text-2);
-  min-width: 60px;
-  text-align: center;
 }
 </style>

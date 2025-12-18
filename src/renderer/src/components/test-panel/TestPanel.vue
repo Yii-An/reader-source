@@ -17,6 +17,7 @@
 -->
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { ChevronLeftIcon, ChevronRightIcon } from 'tdesign-icons-vue-next'
 import type { UniversalRule } from '../../types/universal'
 import { UniversalContentType } from '../../types/universal'
 import { useLogStore } from '../../stores/logStore'
@@ -222,6 +223,82 @@ const hasResults = computed(() => {
       return false
   }
 })
+
+/**
+ * 当前是否支持分页
+ */
+const currentHasPagination = computed(() => {
+  switch (testType.value) {
+    case 'search':
+      return searchHasPagination.value
+    case 'discover':
+      return discoverHasNextPage.value
+    case 'chapter':
+      return chapterHasPagination.value
+    case 'content':
+      return contentHasPagination.value
+    default:
+      return false
+  }
+})
+
+/**
+ * 当前页码
+ */
+const currentPage = computed(() => {
+  switch (testType.value) {
+    case 'search':
+      return searchPage.value
+    case 'discover':
+      return discoverPage.value
+    case 'chapter':
+      return chapterPage.value
+    case 'content':
+      return contentPage.value
+    default:
+      return 1
+  }
+})
+
+/**
+ * 上一页
+ */
+async function handlePrevPage() {
+  switch (testType.value) {
+    case 'search':
+      await goSearchPrevPage()
+      break
+    case 'discover':
+      await goDiscoverPrevPage()
+      break
+    case 'chapter':
+      await goChapterPrevPage()
+      break
+    case 'content':
+      await goContentPrevPage()
+      break
+  }
+}
+
+/**
+ * 下一页
+ */
+async function handleNextPage() {
+  switch (testType.value) {
+    case 'search':
+      await goSearchNextPage()
+      break
+    case 'discover':
+      await goDiscoverNextPage()
+      break
+    case 'chapter':
+      await goChapterNextPage()
+      break
+    case 'content':
+      await goContentNextPage()
+      break
+  }
+}
 
 // ==================== Watch 监听器 ====================
 
@@ -865,10 +942,6 @@ function selectResult(item: { name: string; url: string }): void {
           v-if="testType === 'search'"
           v-model:keyword="searchKeyword"
           :loading="testing"
-          :page="searchPage"
-          :has-pagination="searchHasPagination"
-          @prev-page="goSearchPrevPage"
-          @next-page="goSearchNextPage"
           @test="runTest"
         />
         <DiscoverInput
@@ -878,32 +951,20 @@ function selectResult(item: { name: string; url: string }): void {
           :selected-item-index="selectedItemIndex"
           :loading="testing"
           :categories-loading="categoriesLoading"
-          :page="discoverPage"
-          :has-pagination="discoverHasNextPage"
           @select-group="selectGroup"
           @select-item="selectItem"
-          @prev-page="goDiscoverPrevPage"
-          @next-page="goDiscoverNextPage"
           @test="runTest"
         />
         <ChapterInput
           v-else-if="testType === 'chapter'"
           v-model:url="chapterUrl"
           :loading="testing"
-          :page="chapterPage"
-          :has-pagination="chapterHasPagination"
-          @prev-page="goChapterPrevPage"
-          @next-page="goChapterNextPage"
           @test="runTest"
         />
         <ContentInput
           v-else
           v-model:url="contentUrl"
           :loading="testing"
-          :page="contentPage"
-          :has-pagination="contentHasPagination"
-          @prev-page="goContentPrevPage"
-          @next-page="goContentNextPage"
           @test="runTest"
         />
       </div>
@@ -918,6 +979,27 @@ function selectResult(item: { name: string; url: string }): void {
         :is-manga="isMangaContent"
         @select="selectResult"
       />
+
+      <!-- Floating Pagination -->
+      <div v-if="currentHasPagination" class="floating-pagination">
+        <t-button
+          variant="text"
+          shape="circle"
+          :disabled="currentPage <= 1 || testing"
+          @click="handlePrevPage"
+        >
+          <template #icon><chevron-left-icon /></template>
+        </t-button>
+        <span class="page-indicator">{{ currentPage }}</span>
+        <t-button
+          variant="text"
+          shape="circle"
+          :disabled="testing"
+          @click="handleNextPage"
+        >
+          <template #icon><chevron-right-icon /></template>
+        </t-button>
+      </div>
 
       <!-- Empty state -->
       <div v-if="!testing && !hasResults" class="empty-state">
@@ -1016,5 +1098,39 @@ function selectResult(item: { name: string; url: string }): void {
 
 .test-content::-webkit-scrollbar-thumb:hover {
   background: var(--color-fill-4);
+}
+
+.floating-pagination {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-2);
+  z-index: 5;
+  transition: all 0.3s;
+  opacity: 0.9;
+  backdrop-filter: blur(8px);
+}
+
+.floating-pagination:hover {
+  opacity: 1;
+  box-shadow: var(--shadow-3);
+  background: var(--color-bg-1);
+}
+
+.page-indicator {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-1);
+  min-width: 24px;
+  text-align: center;
+  user-select: none;
 }
 </style>
