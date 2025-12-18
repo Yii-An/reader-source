@@ -1039,21 +1039,22 @@ function selectResult(item: { name: string; url: string }): void {
 .test-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px;
+  justify-content: center;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
+  background: var(--color-bg-2);
 }
 
 .test-content {
   position: relative;
   flex: 1;
-  min-height: 0; /* 关键：让 flex 子元素可以收缩 */
-  overflow: hidden; /* 不在这层滚动，让子组件自己控制 */
-  padding: 12px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 16px;
   display: flex;
   flex-direction: column;
+  gap: 16px;
 }
 
 .loading-overlay {
@@ -1071,7 +1072,6 @@ function selectResult(item: { name: string; url: string }): void {
 }
 
 .test-input {
-  margin-bottom: 16px;
   flex-shrink: 0;
 }
 
@@ -1098,9 +1098,7 @@ function selectResult(item: { name: string; url: string }): void {
 
 @media (max-width: 400px) {
   .test-header {
-    flex-direction: column;
-    gap: 8px;
-    align-items: stretch;
+    padding: 8px 12px;
   }
 }
 
@@ -1120,20 +1118,20 @@ function selectResult(item: { name: string; url: string }): void {
 
 .floating-pagination {
   position: absolute;
-  bottom: 24px;
+  bottom: 32px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: 12px;
+  padding: 6px 12px;
   background: var(--color-bg-2);
   border: 1px solid var(--color-border);
-  border-radius: 20px;
+  border-radius: 24px;
   box-shadow: var(--shadow-2);
   z-index: 5;
   transition: all 0.3s;
-  opacity: 0.9;
+  opacity: 0.95;
   backdrop-filter: blur(8px);
 }
 
@@ -1141,14 +1139,16 @@ function selectResult(item: { name: string; url: string }): void {
   opacity: 1;
   box-shadow: var(--shadow-3);
   background: var(--color-bg-1);
+  transform: translateX(-50%) translateY(-2px);
 }
 
 .page-indicator {
   font-size: 14px;
   font-weight: 500;
   color: var(--color-text-1);
-  min-width: 24px;
+  min-width: 32px;
   text-align: center;
   user-select: none;
+  font-feature-settings: "tnum";
 }
 </style>
