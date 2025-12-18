@@ -264,19 +264,28 @@ const currentPage = computed(() => {
  * 上一页
  */
 async function handlePrevPage() {
-  switch (testType.value) {
-    case 'search':
-      await goSearchPrevPage()
-      break
-    case 'discover':
-      await goDiscoverPrevPage()
-      break
-    case 'chapter':
-      await goChapterPrevPage()
-      break
-    case 'content':
-      await goContentPrevPage()
-      break
+  if (testing.value) return
+  testing.value = true
+  try {
+    switch (testType.value) {
+      case 'search':
+        await goSearchPrevPage()
+        break
+      case 'discover':
+        await goDiscoverPrevPage()
+        break
+      case 'chapter':
+        await goChapterPrevPage()
+        break
+      case 'content':
+        await goContentPrevPage()
+        break
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    logStore.error(`翻页失败: ${message}`)
+  } finally {
+    testing.value = false
   }
 }
 
@@ -284,19 +293,28 @@ async function handlePrevPage() {
  * 下一页
  */
 async function handleNextPage() {
-  switch (testType.value) {
-    case 'search':
-      await goSearchNextPage()
-      break
-    case 'discover':
-      await goDiscoverNextPage()
-      break
-    case 'chapter':
-      await goChapterNextPage()
-      break
-    case 'content':
-      await goContentNextPage()
-      break
+  if (testing.value) return
+  testing.value = true
+  try {
+    switch (testType.value) {
+      case 'search':
+        await goSearchNextPage()
+        break
+      case 'discover':
+        await goDiscoverNextPage()
+        break
+      case 'chapter':
+        await goChapterNextPage()
+        break
+      case 'content':
+        await goContentNextPage()
+        break
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    logStore.error(`翻页失败: ${message}`)
+  } finally {
+    testing.value = false
   }
 }
 
@@ -986,6 +1004,7 @@ function selectResult(item: { name: string; url: string }): void {
           variant="text"
           shape="circle"
           :disabled="currentPage <= 1 || testing"
+          :loading="testing"
           @click="handlePrevPage"
         >
           <template #icon><chevron-left-icon /></template>
@@ -995,6 +1014,7 @@ function selectResult(item: { name: string; url: string }): void {
           variant="text"
           shape="circle"
           :disabled="testing"
+          :loading="testing"
           @click="handleNextPage"
         >
           <template #icon><chevron-right-icon /></template>
