@@ -85,9 +85,7 @@ const emit = defineEmits<{
 }
 
 .discover-category-panel {
-  background: var(--color-bg-3);
-  border-radius: 8px;
-  padding: 12px;
+  padding: 0 0 12px 0;
   margin-bottom: 8px;
   display: flex;
   flex-direction: column;
