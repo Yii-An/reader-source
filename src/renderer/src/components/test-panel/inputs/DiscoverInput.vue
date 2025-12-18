@@ -25,28 +25,32 @@ const emit = defineEmits<{
   <div class="discover-input">
     <div v-if="groups.length > 0" class="discover-category-panel">
       <div class="category-groups">
-        <t-button
-          v-for="(group, gIdx) in groups"
-          :key="gIdx"
-          :theme="selectedGroupIndex === gIdx ? 'primary' : 'default'"
-          variant="text"
+        <t-radio-group
+          :value="selectedGroupIndex"
+          variant="default-filled"
           size="small"
-          @click="emit('select-group', gIdx)"
+          @change="(val: any) => emit('select-group', val as number)"
         >
-          {{ group.name }}
-        </t-button>
+          <t-radio-button v-for="(group, gIdx) in groups" :key="gIdx" :value="gIdx">
+            {{ group.name }}
+          </t-radio-button>
+        </t-radio-group>
       </div>
       <div v-if="groups[selectedGroupIndex]?.items.length > 1" class="category-items">
-        <t-button
-          v-for="(item, iIdx) in groups[selectedGroupIndex].items"
-          :key="iIdx"
-          :theme="selectedItemIndex === iIdx ? 'primary' : 'default'"
-          variant="text"
+        <t-radio-group
+          :value="selectedItemIndex"
+          variant="default-filled"
           size="small"
-          @click="emit('select-item', iIdx)"
+          @change="(val: any) => emit('select-item', val as number)"
         >
-          {{ item.name }}
-        </t-button>
+          <t-radio-button
+            v-for="(item, iIdx) in groups[selectedGroupIndex].items"
+            :key="iIdx"
+            :value="iIdx"
+          >
+            {{ item.name }}
+          </t-radio-button>
+        </t-radio-group>
       </div>
     </div>
 
@@ -85,19 +89,15 @@ const emit = defineEmits<{
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .category-groups,
 .category-items {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-}
-
-.category-items {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--color-border);
 }
 
 .pagination-controls {
