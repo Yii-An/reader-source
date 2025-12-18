@@ -1004,7 +1004,6 @@ function selectResult(item: { name: string; url: string }): void {
           variant="text"
           shape="circle"
           :disabled="currentPage <= 1 || testing"
-          :loading="testing"
           @click="handlePrevPage"
         >
           <template #icon><chevron-left-icon /></template>
@@ -1014,7 +1013,6 @@ function selectResult(item: { name: string; url: string }): void {
           variant="text"
           shape="circle"
           :disabled="testing"
-          :loading="testing"
           @click="handleNextPage"
         >
           <template #icon><chevron-right-icon /></template>
