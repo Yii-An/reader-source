@@ -50,10 +50,6 @@ export const universalRuleSchema = {
       type: 'string',
       description: '规则备注说明'
     },
-    jsLib: {
-      type: 'string',
-      description: 'JS 函数库 (复杂规则共用函数)'
-    },
     contentType: {
       type: 'string',
       description: '内容类型',
@@ -63,17 +59,7 @@ export const universalRuleSchema = {
       type: 'string',
       description: '自定义 User-Agent'
     },
-    headers: {
-      type: 'object',
-      description: '自定义请求头',
-      additionalProperties: { type: 'string' }
-    },
-    loadJs: {
-      type: 'string',
-      description: '全局 JS 脚本 (页面加载时执行)'
-    },
     search: { $ref: '#/$defs/searchRule' },
-    detail: { $ref: '#/$defs/detailRule' },
     chapter: { $ref: '#/$defs/chapterRule' },
     discover: { $ref: '#/$defs/discoverRule' },
     content: { $ref: '#/$defs/contentRule' },
@@ -97,24 +83,6 @@ export const universalRuleSchema = {
         result: { type: 'string', description: '结果 URL 选择器' }
       }
     },
-    detailRule: {
-      type: 'object',
-      description: '详情页规则配置',
-      properties: {
-        enabled: { type: 'boolean', description: '是否启用详情页' },
-        url: { type: 'string', description: '详情页 URL' },
-        init: { type: 'string', description: '预处理规则' },
-        name: { type: 'string', description: '书名选择器' },
-        author: { type: 'string', description: '作者选择器' },
-        cover: { type: 'string', description: '封面选择器' },
-        description: { type: 'string', description: '简介选择器' },
-        latestChapter: { type: 'string', description: '最新章节选择器' },
-        wordCount: { type: 'string', description: '字数选择器' },
-        tags: { type: 'string', description: '分类选择器' },
-        tocUrl: { type: 'string', description: '目录 URL 选择器' },
-        canRename: { type: 'boolean', description: '是否允许修改书名和作者' }
-      }
-    },
     chapterRule: {
       type: 'object',
       description: '章节/目录规则配置',
@@ -127,17 +95,7 @@ export const universalRuleSchema = {
         result: { type: 'string', description: '章节 URL 选择器' },
         nextUrl: { type: 'string', description: '下一页目录 URL' },
         isVip: { type: 'string', description: 'VIP 标识选择器' },
-        isPay: { type: 'string', description: '付费标识选择器' },
-        info: { type: 'string', description: '章节信息选择器' },
-        multiRoads: {
-          type: 'object',
-          description: '多线路配置',
-          properties: {
-            enabled: { type: 'boolean', description: '是否启用多线路' },
-            roads: { type: 'string', description: '线路列表选择器' },
-            roadName: { type: 'string', description: '线路名选择器' }
-          }
-        }
+        isPay: { type: 'string', description: '付费标识选择器' }
       }
     },
     discoverRule: {
@@ -164,24 +122,7 @@ export const universalRuleSchema = {
       properties: {
         url: { type: 'string', description: '正文页 URL' },
         items: { type: 'string', description: '正文内容选择器' },
-        nextUrl: { type: 'string', description: '下一页正文 URL' },
-        decoder: { type: 'string', description: '内容解密器脚本' },
-        imageHeaders: { type: 'string', description: '图片请求头' },
-        webView: { type: 'boolean', description: '是否使用 WebView 加载正文' },
-        payAction: { type: 'string', description: '付费购买操作' },
-        sourceRegex: { type: 'string', description: '资源正则' },
-        replaceRules: {
-          type: 'array',
-          description: '正文净化替换规则',
-          items: {
-            type: 'object',
-            properties: {
-              pattern: { type: 'string', description: '匹配模式' },
-              replacement: { type: 'string', description: '替换内容' },
-              isRegex: { type: 'boolean', description: '是否为正则表达式' }
-            }
-          }
-        }
+        nextUrl: { type: 'string', description: '下一页正文 URL' }
       }
     },
     ruleMeta: {

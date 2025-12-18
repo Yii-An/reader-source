@@ -7,7 +7,6 @@ import { ref, watch, nextTick } from 'vue'
 import type {
   UniversalRule,
   UniversalSearchRule,
-  UniversalDetailRule,
   UniversalChapterRule,
   UniversalDiscoverRule,
   UniversalContentRule
@@ -17,7 +16,6 @@ import MonacoEditor from '../MonacoEditor.vue'
 import EditorToolbar from './EditorToolbar.vue'
 import BasicInfoForm from './forms/BasicInfoForm.vue'
 import SearchRuleForm from './forms/SearchRuleForm.vue'
-import DetailRuleForm from './forms/DetailRuleForm.vue'
 import ChapterRuleForm from './forms/ChapterRuleForm.vue'
 import DiscoverRuleForm from './forms/DiscoverRuleForm.vue'
 import ContentRuleForm from './forms/ContentRuleForm.vue'
@@ -110,12 +108,6 @@ function ensureContent(): void {
   }
 }
 
-function ensureDetail(): void {
-  if (!localRule.value.detail) {
-    localRule.value.detail = { enabled: false }
-  }
-}
-
 function ensureDiscover(): void {
   if (!localRule.value.discover) {
     localRule.value.discover = { enabled: false, url: '', list: '', name: '', result: '' }
@@ -128,10 +120,6 @@ function handleBasicUpdate(rule: UniversalRule): void {
 
 function handleSearchUpdate(rule: UniversalSearchRule): void {
   localRule.value = { ...localRule.value, search: rule }
-}
-
-function handleDetailUpdate(rule: UniversalDetailRule): void {
-  localRule.value = { ...localRule.value, detail: rule }
 }
 
 function handleChapterUpdate(rule: UniversalChapterRule): void {
@@ -162,7 +150,7 @@ function handleContentUpdate(rule: UniversalContentRule): void {
     </div>
 
     <div v-show="editorMode === 'form'" class="form-editor">
-      <t-form :data="localRule" layout="vertical">
+      <t-form :data="localRule" layout="vertical" label-align="top">
         <t-collapse :default-expand-all="false" :default-value="['basic', 'search']">
           <t-collapse-panel value="basic" header="基本信息">
             <BasicInfoForm :rule="localRule" @update:rule="handleBasicUpdate" />
@@ -170,10 +158,6 @@ function handleContentUpdate(rule: UniversalContentRule): void {
 
           <t-collapse-panel value="search" header="搜索规则" @click="ensureSearch">
             <SearchRuleForm :rule="localRule.search" @update:rule="handleSearchUpdate" />
-          </t-collapse-panel>
-
-          <t-collapse-panel value="detail" header="详情页规则" @click="ensureDetail">
-            <DetailRuleForm :rule="localRule.detail" @update:rule="handleDetailUpdate" />
           </t-collapse-panel>
 
           <t-collapse-panel value="chapter" header="章节/目录规则" @click="ensureChapter">

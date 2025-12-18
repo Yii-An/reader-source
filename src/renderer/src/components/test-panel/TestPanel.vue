@@ -355,6 +355,7 @@ async function runSearchTest(page?: number): Promise<void> {
     author: props.rule.search.author || '',
     description: props.rule.search.description || '',
     latestChapter: props.rule.search.latestChapter || '',
+    wordCount: props.rule.search.wordCount || '',
     tags: props.rule.search.tags || '',
     url: props.rule.search.result || 'a@href'
   })
@@ -430,6 +431,7 @@ async function runDiscoverTest(page?: number, nextPageUrl?: string): Promise<voi
       author: props.rule.discover.author || '',
       description: props.rule.discover.description || '',
       latestChapter: props.rule.discover.latestChapter || '',
+      wordCount: props.rule.discover.wordCount || '',
       tags: props.rule.discover.tags || '',
       url: props.rule.discover.result || 'a@href'
     },
@@ -675,6 +677,8 @@ async function runChapterTest(page?: number): Promise<void> {
       name: props.rule.chapter?.name || '@text',
       cover: props.rule.chapter?.cover || '',
       time: props.rule.chapter?.time || '',
+      isVip: props.rule.chapter?.isVip || '',
+      isPay: props.rule.chapter?.isPay || '',
       url: props.rule.chapter?.result || 'a@href'
     },
     props.rule.chapter?.nextUrl // 传入 nextUrl 规则

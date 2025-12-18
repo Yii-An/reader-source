@@ -92,21 +92,5 @@ function updateField<K extends keyof UniversalRule>(field: K, value: UniversalRu
         @change="updateField('userAgent', $event as string)"
       />
     </t-form-item>
-    <t-form-item label="全局 JS 脚本 (loadJs)">
-      <t-textarea
-        :value="rule.loadJs"
-        placeholder="页面加载时执行的 JS 脚本（可选）"
-        :autosize="{ minRows: 2 }"
-        @change="updateField('loadJs', $event as string)"
-      />
-    </t-form-item>
-    <t-form-item label="JS 函数库 (jsLib)">
-      <t-textarea
-        :value="rule.jsLib"
-        placeholder="复杂规则共用的 JS 函数（可选）"
-        :autosize="{ minRows: 3 }"
-        @change="updateField('jsLib', $event as string)"
-      />
-    </t-form-item>
   </div>
 </template>

@@ -29,33 +29,6 @@ export interface UniversalSearchRule {
 }
 
 /**
- * 详情页规则
- */
-export interface UniversalDetailRule {
-  enabled?: boolean
-  url?: string
-  init?: string
-  name?: string
-  author?: string
-  cover?: string
-  description?: string
-  latestChapter?: string
-  wordCount?: string
-  tags?: string
-  tocUrl?: string
-  canRename?: boolean
-}
-
-/**
- * 多线路支持配置
- */
-export interface MultiRoadsConfig {
-  enabled: boolean
-  roads?: string
-  roadName?: string
-}
-
-/**
  * 章节规则
  */
 export interface UniversalChapterRule {
@@ -68,8 +41,6 @@ export interface UniversalChapterRule {
   nextUrl?: string
   isVip?: string
   isPay?: string
-  info?: string
-  multiRoads?: MultiRoadsConfig
 }
 
 /**
@@ -91,27 +62,12 @@ export interface UniversalDiscoverRule {
 }
 
 /**
- * 正文替换规则
- */
-export interface ContentReplaceRule {
-  pattern: string
-  replacement: string
-  isRegex?: boolean
-}
-
-/**
  * 正文规则
  */
 export interface UniversalContentRule {
   url?: string
   items: string
   nextUrl?: string
-  decoder?: string
-  imageHeaders?: string
-  webView?: boolean
-  payAction?: string
-  sourceRegex?: string
-  replaceRules?: ContentReplaceRule[]
 }
 
 /**
@@ -137,13 +93,9 @@ export interface UniversalRule {
   sort?: number
   enabled?: boolean
   comment?: string
-  jsLib?: string
   contentType: UniversalContentType
   userAgent?: string
-  headers?: Record<string, string>
-  loadJs?: string
   search?: UniversalSearchRule
-  detail?: UniversalDetailRule
   chapter?: UniversalChapterRule
   discover?: UniversalDiscoverRule
   content?: UniversalContentRule

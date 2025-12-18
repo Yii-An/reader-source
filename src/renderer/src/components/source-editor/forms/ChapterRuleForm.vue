@@ -55,13 +55,6 @@ function updateField<K extends keyof UniversalChapterRule>(
         @change="updateField('time', $event as string)"
       />
     </t-form-item>
-    <t-form-item label="章节信息规则 (info)">
-      <t-input
-        :value="rule.info"
-        placeholder="章节信息规则（可选）"
-        @change="updateField('info', $event as string)"
-      />
-    </t-form-item>
     <t-form-item label="章节URL规则 (result)">
       <t-input
         :value="rule.result"

@@ -5,9 +5,6 @@
 // 导出规则类型
 export * from './universal'
 
-// 导出表达式类型
-export * from './expression'
-
 /**
  * 日志级别
  */
