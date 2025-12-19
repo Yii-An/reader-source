@@ -2,12 +2,12 @@
 
 ## 当前工作状态
 
-**日期**: 2025-12-17
-**阶段**: 架构简化完成
+**日期**: 2025-12-19
+**阶段**: 稳定维护
 
 ## 项目状态概述
 
-Reader Source 是一个专为 Scripting Reader 插件设计的书源编辑器桌面应用，核心功能已实现：
+Reader Source 是一个专为 Scripting Reader 插件设计的书源编辑器桌面应用，核心功能已完成：
 
 - ✅ Electron + Vue 3 架构搭建
 - ✅ 书源列表管理（CRUD）
@@ -22,14 +22,21 @@ Reader Source 是一个专为 Scripting Reader 插件设计的书源编辑器桌
 
 ## 代码库统计
 
-- **主进程**: 3 文件（index.ts, logger.ts, proxy.ts）
+- **主进程**: 3 文件（index.ts, logger.ts, proxy.ts - 共约 1500 行）
 - **渲染进程组件**: 约 25 个 Vue 组件
-- **类型定义**: 4 个类型文件
+- **类型定义**: 2 个类型文件（index.ts, universal.ts）
 - **Schema**: 2 个（TS + JSON）
 - **文档**: 3 个规范文档（docs/）
-- **总代码行数**: 约 5500+ 行
+- **总代码行数**: 约 5000+ 行
 
 ## 近期变更
+
+### 2025-12-19 Memory Bank 更新
+
+1. **文档修正**：
+   - 修正 UI 组件库名称（Arco Design Vue → TDesign Vue Next）
+   - 移除不存在的 DetailRuleForm.vue 记录
+   - 更新类型文件行数（universal.ts 136 行）
 
 ### 2025-12-17 架构简化
 
@@ -43,7 +50,7 @@ Reader Source 是一个专为 Scripting Reader 插件设计的书源编辑器桌
    - 删除 `test_rules/` 目录
 
 3. **类型系统简化**：
-   - [`universal.ts`](src/renderer/src/types/universal.ts) 精简为 184 行
+   - [`universal.ts`](src/renderer/src/types/universal.ts) 精简为 136 行
    - 内容类型仅保留 `novel` 和 `manga`
    - 移除平台特有字段（anyReader, legado）
    - `_meta.sourceFormat` 固定为 `'universal'`

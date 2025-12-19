@@ -74,8 +74,7 @@ src/
     │   │       ├── SearchRuleForm.vue     # 搜索规则
     │   │       ├── ChapterRuleForm.vue    # 章节规则
     │   │       ├── DiscoverRuleForm.vue   # 发现规则
-    │   │       ├── ContentRuleForm.vue    # 正文规则
-    │   │       └── DetailRuleForm.vue     # 详情规则
+    │   │       └── ContentRuleForm.vue    # 正文规则
     │   │
     │   └── test-panel/            # 测试面板模块
     │       ├── TestPanel.vue      # 测试面板主组件
@@ -106,10 +105,8 @@ src/
     │   └── logStore.ts            # 日志状态管理
     │
     ├── types/                     # TypeScript 类型定义
-    │   ├── index.ts               # 类型入口
-    │   ├── universal.ts           # 规则类型定义（184行）
-    │   ├── expression.ts          # 表达式类型
-    │   └── guards.ts              # 类型守卫
+    │   ├── index.ts               # 类型入口（含日志类型）
+    │   └── universal.ts           # 规则类型定义（136行）
     │
     ├── router/                    # Vue Router 配置
     │   └── index.ts               # 路由定义（含 /batch-test）

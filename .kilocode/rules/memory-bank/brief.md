@@ -17,7 +17,7 @@
 | 框架     | Electron + Vue 3 + TypeScript |
 | 构建工具 | electron-vite + Vite          |
 | 状态管理 | Pinia                         |
-| UI 组件  | Arco Design Vue               |
+| UI 组件  | TDesign Vue Next              |
 | 代码编辑 | Monaco Editor                 |
 | 数据存储 | IndexedDB (idb-keyval)        |
 | 网页解析 | Cheerio + Puppeteer           |
