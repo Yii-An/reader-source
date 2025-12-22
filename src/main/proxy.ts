@@ -132,6 +132,7 @@ async function handleProxy(request: ProxyRequest): Promise<ProxyResponse> {
   try {
     console.log('='.repeat(50))
     console.log('Fetching URL:', url)
+    console.log('User-Agent:', userAgent || '(默认)')
     const browserInstance = await getBrowser()
     page = await browserInstance.newPage()
 
@@ -573,6 +574,45 @@ function extractValue($context: any, rule: string, host?: string, fieldName?: st
 
   const logPrefix = fieldName ? `[Parse:${fieldName}]` : '[Parse:extractValue]'
 
+  // 处理 || 备选规则语法：依次尝试每个规则，直到有一个成功
+  if (rule.includes('||')) {
+    const alternatives = rule.split('||').map((r) => r.trim())
+    console.log(`${logPrefix} 备选规则: ${alternatives.length} 个选项`)
+    for (let i = 0; i < alternatives.length; i++) {
+      const alt = alternatives[i]
+      console.log(`${logPrefix} 尝试备选 ${i + 1}: "${alt}"`)
+      try {
+        const result = extractValueSingle($context, alt, host, logPrefix)
+        if (result) {
+          console.log(`${logPrefix} 备选 ${i + 1} 成功: "${result.substring(0, 50)}"`)
+          return result
+        }
+        console.log(`${logPrefix} 备选 ${i + 1} 返回空值，尝试下一个`)
+      } catch (e) {
+        console.log(`${logPrefix} 备选 ${i + 1} 失败: ${e instanceof Error ? e.message : e}`)
+      }
+    }
+    console.log(`${logPrefix} 所有备选规则均失败，返回空值`)
+    return ''
+  }
+
+  // 单一规则
+  console.log(`${logPrefix} 规则: "${rule}"`)
+  return extractValueSingle($context, rule, host, logPrefix)
+}
+
+/**
+ * 提取单一规则的值（不含 || 备选逻辑）
+ */
+function extractValueSingle(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  $context: any,
+  rule: string,
+  host?: string,
+  logPrefix?: string
+): string {
+  const prefix = logPrefix || '[Parse:extractValue]'
+
   // 解析 ##pattern##replacement 正则替换语法
   let replacePattern: string | null = null
   let replaceWith: string | null = null
@@ -581,9 +621,7 @@ function extractValue($context: any, rule: string, host?: string, fieldName?: st
     replacePattern = replaceMatch[1]
     replaceWith = replaceMatch[2]
     rule = rule.slice(0, -replaceMatch[0].length) // 移除替换部分
-    console.log(`${logPrefix} 规则: "${rule}" 正则替换: ##${replacePattern}##${replaceWith}`)
-  } else {
-    console.log(`${logPrefix} 规则: "${rule}"`)
+    console.log(`${prefix} 正则替换: ##${replacePattern}##${replaceWith}`)
   }
 
   const atIndex = rule.lastIndexOf('@')
@@ -603,21 +641,21 @@ function extractValue($context: any, rule: string, host?: string, fieldName?: st
     selector = rule
   }
 
-  console.log(`${logPrefix} 选择器: "${selector}", 属性: "${attr}"`)
+  console.log(`${prefix} 选择器: "${selector}", 属性: "${attr}"`)
 
   let $target = selector ? $context.find(selector) : $context
   const foundCount = $target.length
-  console.log(`${logPrefix} 找到 ${foundCount} 个元素`)
+  console.log(`${prefix} 找到 ${foundCount} 个元素`)
 
   if ($target.length === 0) {
-    console.log(`${logPrefix} 未找到元素，使用上下文元素`)
+    console.log(`${prefix} 未找到元素，使用上下文元素`)
     $target = $context
   }
 
   // 打印目标元素的 HTML 预览（压缩为一行）
   const targetHtml = ($target.first().prop('outerHTML') || '').replace(/\s+/g, ' ')
   console.log(
-    `${logPrefix} 目标元素 HTML (前200字符): ${targetHtml.substring(0, 200)}${targetHtml.length > 200 ? '...' : ''}`
+    `${prefix} 目标元素 HTML (前200字符): ${targetHtml.substring(0, 200)}${targetHtml.length > 200 ? '...' : ''}`
   )
 
   let value = ''
@@ -640,7 +678,7 @@ function extractValue($context: any, rule: string, host?: string, fieldName?: st
 
   // 压缩换行符以便日志显示在一行
   const compressedValue = value.replace(/\s+/g, ' ').substring(0, 100)
-  console.log(`${logPrefix} 原始值: "${compressedValue}${value.length > 100 ? '...' : ''}"`)
+  console.log(`${prefix} 原始值: "${compressedValue}${value.length > 100 ? '...' : ''}"`)
 
   // 应用正则替换
   if (replacePattern !== null && replaceWith !== null) {
@@ -648,11 +686,9 @@ function extractValue($context: any, rule: string, host?: string, fieldName?: st
       const regex = new RegExp(replacePattern)
       const originalValue = value
       value = value.replace(regex, replaceWith)
-      console.log(
-        `${logPrefix} 正则替换后: "${value}" (原值: "${originalValue.substring(0, 100)}")`
-      )
+      console.log(`${prefix} 正则替换后: "${value}" (原值: "${originalValue.substring(0, 100)}")`)
     } catch (e) {
-      console.error(`${logPrefix} 正则替换失败:`, e)
+      console.error(`${prefix} 正则替换失败:`, e)
     }
   }
 
@@ -667,11 +703,11 @@ function extractValue($context: any, rule: string, host?: string, fieldName?: st
       const baseHost = host.endsWith('/') ? host.slice(0, -1) : host
       value = value.startsWith('/') ? baseHost + value : baseHost + '/' + value
     }
-    console.log(`${logPrefix} URL 补全后: "${value}"`)
+    console.log(`${prefix} URL 补全后: "${value}"`)
   }
 
   const finalCompressed = value.replace(/\s+/g, ' ').substring(0, 100)
-  console.log(`${logPrefix} 最终值: "${finalCompressed}${value.length > 100 ? '...' : ''}"`)
+  console.log(`${prefix} 最终值: "${finalCompressed}${value.length > 100 ? '...' : ''}"`)
   return value
 }
 
@@ -686,6 +722,28 @@ function extractValueSilent($context: any, rule: string, host?: string): string 
     return ''
   }
 
+  // 处理 || 备选规则语法：依次尝试每个规则，直到有一个成功
+  if (rule.includes('||')) {
+    const alternatives = rule.split('||').map((r) => r.trim())
+    for (const alt of alternatives) {
+      try {
+        const result = extractValueSilentSingle($context, alt, host)
+        if (result) return result
+      } catch {
+        // 继续尝试下一个
+      }
+    }
+    return ''
+  }
+
+  return extractValueSilentSingle($context, rule, host)
+}
+
+/**
+ * 提取单一规则的值（静默版本，不含 || 备选逻辑）
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractValueSilentSingle($context: any, rule: string, host?: string): string {
   // 解析 ##pattern##replacement 正则替换语法
   let replacePattern: string | null = null
   let replaceWith: string | null = null
@@ -776,6 +834,7 @@ async function handleExecuteJs(request: ExecuteJsRequest): Promise<ExecuteJsResp
   try {
     console.log('='.repeat(50))
     console.log('[ExecuteJs] Fetching URL:', url)
+    console.log('[ExecuteJs] User-Agent:', userAgent || '(默认)')
     const browserInstance = await getBrowser()
     page = await browserInstance.newPage()
 
@@ -870,7 +929,6 @@ async function handleExecuteJs(request: ExecuteJsRequest): Promise<ExecuteJsResp
       (params: { html: string; code: string }) => {
         try {
           // 注入 result 变量，使其包含页面 HTML，供用户脚本使用
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const result = params.html
           void result // 显式使用变量以避免 TS 错误
           // 使用 eval，它会返回最后一个表达式的值
@@ -923,6 +981,7 @@ async function handleParseInPage(request: ParseInPageRequest): Promise<ParseResp
   try {
     console.log('='.repeat(50))
     console.log('[ParseInPage] URL:', url)
+    console.log('[ParseInPage] User-Agent:', userAgent || '(默认)')
     console.log('[ParseInPage] listRule:', listRule)
     console.log('[ParseInPage] contentRule:', contentRule)
     console.log('[ParseInPage] fields:', JSON.stringify(fields))

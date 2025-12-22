@@ -22,7 +22,7 @@ const emit = defineEmits<{
       <t-input
         :value="searchQuery"
         placeholder="搜索书源..."
-        size="small"
+        size="medium"
         clearable
         @change="emit('update:search-query', $event as string)"
       >
@@ -49,7 +49,7 @@ const emit = defineEmits<{
               <div class="source-item-host">{{ source.host }}</div>
             </div>
             <t-dropdown trigger="click" @click.stop>
-              <t-button variant="text" size="small">
+              <t-button variant="text" size="medium">
                 <template #icon><ellipsis-icon /></template>
               </t-button>
               <template #dropdown>
@@ -101,11 +101,11 @@ const emit = defineEmits<{
 }
 
 .source-item {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px;
-  border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s;
 }

@@ -1,54 +1,64 @@
 <!--
-  @file BatchTest.vue - 批量测试页面
+  @file BatchTest.vue - 批量测试页面（顺序链式测试版）
+  测试流程: 搜索 → 章节 → 正文 → 发现
 -->
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronLeftIcon, LoadingIcon } from 'tdesign-icons-vue-next'
+import { ChevronLeftIcon } from 'tdesign-icons-vue-next'
+import { MessagePlugin } from 'tdesign-vue-next'
 import { useSourceStore } from '../stores/sourceStore'
-import { useLogStore } from '../stores/logStore'
+import { useBatchTest } from '../components/test-panel/composables/useBatchTest'
 import {
-  useBatchTest,
-  type BatchTestResult
-} from '../components/test-panel/composables/useBatchTest'
-import ResultTabs from '../components/test-panel/results/ResultTabs.vue'
+  BatchTestToolbar,
+  BatchTestConfig,
+  BatchTestSourceList,
+  BatchTestDetail
+} from '../components/batch-test'
 import type { UniversalRule } from '../types/universal'
+import type { ChainTestResult } from '../types/batch-test'
 
 const router = useRouter()
 const sourceStore = useSourceStore()
-const logStore = useLogStore()
-const { runBatchTest } = useBatchTest()
+const { config, testing, runBatchTest, cancelTest, retrySource, saveConfig } = useBatchTest()
 
+// Input state
 const keyword = ref('')
+
+// Selection state
 const selectedSourceIds = ref<string[]>([])
-const testResults = ref<Map<string, BatchTestResult>>(new Map())
-const testing = ref(false)
+const testResults = ref<Map<string, ChainTestResult>>(new Map())
 const selectedDetailId = ref<string | null>(null)
 
-const isAllSelected = computed(() => {
-  return (
-    sourceStore.sources.length > 0 && selectedSourceIds.value.length === sourceStore.sources.length
-  )
-})
+// Config drawer
+const showConfigDrawer = ref(false)
 
+// Computed
 const testStats = computed(() => {
   let success = 0
   let error = 0
-  let pending = 0
-  let totalCount = 0
+  let running = 0
 
   testResults.value.forEach((result) => {
-    if (result.status === 'success') {
-      success++
-      totalCount += result.count
-    } else if (result.status === 'error') {
-      error++
-    } else {
-      pending++
+    if (result.currentStep === 'completed') {
+      const hasError =
+        result.search.status === 'error' ||
+        result.chapter.status === 'error' ||
+        result.content.status === 'error' ||
+        (result.hasDiscover && result.discover.status === 'error')
+      if (hasError) {
+        error++
+      } else {
+        success++
+      }
+    } else if (result.currentStep !== 'search' || result.search.status === 'running') {
+      running++
     }
   })
 
-  return { success, error, pending, totalCount }
+  const total = testResults.value.size
+
+  return { success, error, running, total }
 })
 
 const selectedSource = computed<UniversalRule | undefined>(() => {
@@ -56,50 +66,44 @@ const selectedSource = computed<UniversalRule | undefined>(() => {
   return sourceStore.sources.find((s) => s.id === selectedDetailId.value)
 })
 
-const selectedResult = computed<BatchTestResult | undefined>(() => {
+const selectedResult = computed<ChainTestResult | undefined>(() => {
   if (!selectedDetailId.value) return undefined
   return testResults.value.get(selectedDetailId.value)
 })
 
+const canStartTest = computed(() => {
+  return selectedSourceIds.value.length > 0 && keyword.value.trim().length > 0
+})
+
+const progressPercent = computed(() => {
+  if (testStats.value.total === 0) return 0
+  const completed = testStats.value.success + testStats.value.error
+  return Math.round((completed / testStats.value.total) * 100)
+})
+
+// Initialize
 selectedSourceIds.value = sourceStore.sources.map((s) => s.id)
 
+// Watch config changes
+watch(
+  config,
+  () => {
+    saveConfig()
+  },
+  { deep: true }
+)
+
+// Methods
 function goBack(): void {
   router.push('/')
 }
 
-function toggleSelectAll(): void {
-  if (isAllSelected.value) {
-    selectedSourceIds.value = []
-  } else {
-    selectedSourceIds.value = sourceStore.sources.map((s) => s.id)
-  }
-}
-
-function toggleSource(id: string): void {
-  const index = selectedSourceIds.value.indexOf(id)
-  if (index > -1) {
-    selectedSourceIds.value.splice(index, 1)
-  } else {
-    selectedSourceIds.value.push(id)
-  }
-}
-
-function selectSourceDetail(id: string): void {
-  selectedDetailId.value = id
-}
-
 async function handleTest(): Promise<void> {
-  if (!keyword.value.trim()) {
-    logStore.warn('请输入搜索关键词')
+  if (!canStartTest.value) {
+    MessagePlugin.warning('请输入搜索关键词')
     return
   }
 
-  if (selectedSourceIds.value.length === 0) {
-    logStore.warn('请选择至少一个书源')
-    return
-  }
-
-  testing.value = true
   testResults.value = new Map()
   selectedDetailId.value = null
 
@@ -110,33 +114,51 @@ async function handleTest(): Promise<void> {
     testResults.value = new Map(testResults.value)
   })
 
-  testing.value = false
-  logStore.info(
-    `[批量测试] 完成: ${testStats.value.success} 成功, ${testStats.value.error} 失败, 共 ${testStats.value.totalCount} 条结果`
-  )
+  MessagePlugin.success(`测试完成: ${testStats.value.success} 成功, ${testStats.value.error} 失败`)
 }
 
-function getResultStatus(source: UniversalRule): { text: string; type: string } {
-  const result = testResults.value.get(source.id)
-  if (!result) return { text: '', type: '' }
+function handleCancel(): void {
+  cancelTest()
+  MessagePlugin.info('已取消测试')
+}
 
-  switch (result.status) {
-    case 'pending':
-      return { text: '等待中', type: 'pending' }
-    case 'running':
-      return { text: '测试中...', type: 'running' }
-    case 'success':
-      return { text: `${result.count} 条 (${result.duration}ms)`, type: 'success' }
-    case 'error':
-      return { text: '失败', type: 'error' }
-    default:
-      return { text: '', type: '' }
+async function handleRetry(source: UniversalRule): Promise<void> {
+  await retrySource(source, keyword.value.trim(), (id, result) => {
+    testResults.value.set(id, result)
+    testResults.value = new Map(testResults.value)
+  })
+}
+
+async function handleRetryAll(): Promise<void> {
+  const failedSources = sourceStore.sources.filter((s) => {
+    const result = testResults.value.get(s.id)
+    if (!result) return false
+    return (
+      result.search.status === 'error' ||
+      result.chapter.status === 'error' ||
+      result.content.status === 'error' ||
+      (result.hasDiscover && result.discover.status === 'error')
+    )
+  })
+
+  if (failedSources.length === 0) {
+    MessagePlugin.info('没有需要重试的书源')
+    return
   }
+
+  MessagePlugin.info(`开始重试 ${failedSources.length} 个书源`)
+
+  for (const source of failedSources) {
+    await handleRetry(source)
+  }
+
+  MessagePlugin.success('重试完成')
 }
 </script>
 
 <template>
   <div class="batch-test-page">
+    <!-- Header -->
     <div class="page-header">
       <div class="header-left">
         <t-button @click="goBack">
@@ -146,112 +168,68 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
         <t-divider layout="vertical" />
         <span class="page-title">批量测试</span>
       </div>
-      <div class="header-center">
-        <t-input
-          v-model="keyword"
-          placeholder="输入搜索关键词"
-          :disabled="testing"
-          style="width: 300px"
-          @enter="handleTest"
-        />
-        <t-button
-          theme="primary"
-          :loading="testing"
-          :disabled="!keyword.trim() || selectedSourceIds.length === 0"
-          style="margin-left: 12px"
-          @click="handleTest"
-        >
-          {{ testing ? '测试中...' : '开始测试' }}
-        </t-button>
-      </div>
+
+      <BatchTestToolbar
+        :testing="testing"
+        :keyword="keyword"
+        :can-start="canStartTest"
+        @update:keyword="keyword = $event"
+        @start="handleTest"
+        @cancel="handleCancel"
+        @open-config="showConfigDrawer = true"
+      />
+
       <div class="header-right">
         <div v-if="testResults.size > 0" class="test-stats">
           <span class="stat-success">✓ {{ testStats.success }}</span>
           <span class="stat-error">✗ {{ testStats.error }}</span>
-          <span class="stat-total">共 {{ testStats.totalCount }} 条结果</span>
+          <span v-if="testStats.running > 0" class="stat-running">● {{ testStats.running }}</span>
         </div>
       </div>
     </div>
 
+    <!-- Progress bar -->
+    <div v-if="testing || testResults.size > 0" class="progress-bar">
+      <t-progress
+        :percentage="progressPercent"
+        :color="testing ? 'var(--color-primary)' : 'var(--color-success)'"
+        :stroke-width="2"
+        :show-label="false"
+      />
+    </div>
+
+    <!-- Body -->
     <div class="page-body">
-      <div class="source-list-panel">
-        <div class="panel-header">
-          <t-checkbox
-            :checked="isAllSelected"
-            :indeterminate="selectedSourceIds.length > 0 && !isAllSelected"
-            :disabled="testing"
-            @change="toggleSelectAll"
-          >
-            全选 ({{ selectedSourceIds.length }}/{{ sourceStore.sources.length }})
-          </t-checkbox>
-        </div>
-        <div class="source-list">
-          <div
-            v-for="source in sourceStore.sources"
-            :key="source.id"
-            class="source-item"
-            :class="{
-              selected: selectedDetailId === source.id,
-              'status-success': testResults.get(source.id)?.status === 'success',
-              'status-error': testResults.get(source.id)?.status === 'error',
-              'status-running': testResults.get(source.id)?.status === 'running'
-            }"
-            @click="selectSourceDetail(source.id)"
-          >
-            <t-checkbox
-              :checked="selectedSourceIds.includes(source.id)"
-              :disabled="testing"
-              @click.stop
-              @change="toggleSource(source.id)"
-            />
-            <div class="source-info">
-              <div class="source-name">{{ source.name }}</div>
-              <div class="source-host">{{ source.host }}</div>
-            </div>
-            <div class="source-status" :class="getResultStatus(source).type">
-              <loading-icon v-if="testResults.get(source.id)?.status === 'running'" />
-              <span>{{ getResultStatus(source).text }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <BatchTestSourceList
+        :sources="sourceStore.sources"
+        :selected-ids="selectedSourceIds"
+        :results="testResults"
+        :selected-detail-id="selectedDetailId"
+        :testing="testing"
+        @update:selected-ids="selectedSourceIds = $event"
+        @select-detail="selectedDetailId = $event"
+        @retry="handleRetry"
+        @retry-all="handleRetryAll"
+      />
 
-      <div class="detail-panel">
-        <template v-if="selectedSource && selectedResult">
-          <div class="detail-header">
-            <h3>{{ selectedSource.name }}</h3>
-            <span class="detail-host">{{ selectedSource.host }}</span>
-          </div>
-          <div class="detail-content">
-            <template v-if="selectedResult.status === 'success'">
-              <ResultTabs
-                type="search"
-                :visual-data="selectedResult.visualData || []"
-                :parsed-result="selectedResult.parsedResult || []"
-                :raw-html="selectedResult.rawHtml || ''"
-              />
-            </template>
-            <template v-else-if="selectedResult.status === 'error'">
-              <t-result theme="error" :title="selectedResult.error" />
-            </template>
-            <template v-else-if="selectedResult.status === 'running'">
-              <div class="loading-state">
-                <t-loading size="32px" />
-                <span>正在测试...</span>
-              </div>
-            </template>
-            <template v-else>
-              <div class="loading-state">
-                <span>等待测试</span>
-              </div>
-            </template>
-          </div>
-        </template>
-        <template v-else>
-          <t-empty description="选择左侧书源查看详细结果" />
-        </template>
-      </div>
+      <BatchTestDetail
+        :source="selectedSource"
+        :result="selectedResult"
+        :testing="testing"
+        @retry="handleRetry"
+      />
     </div>
+
+    <!-- Config drawer -->
+    <BatchTestConfig
+      :visible="showConfigDrawer"
+      :config="config"
+      @update:visible="showConfigDrawer = $event"
+      @update:concurrency="config.concurrency = $event"
+      @update:timeout="config.timeout = $event"
+      @update:continue-on-timeout="config.continueOnTimeout = $event"
+      @update:continue-on-error="config.continueOnError = $event"
+    />
   </div>
 </template>
 
@@ -260,6 +238,9 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
   display: flex;
   flex-direction: column;
   height: 100vh;
+  gap: 12px;
+  padding: 12px 16px 16px;
+  box-sizing: border-box;
   background: var(--color-bg-1);
 }
 
@@ -268,9 +249,15 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 12px 16px;
   background: var(--color-bg-2);
-  border-bottom: 1px solid var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+  position: sticky;
+  top: 12px;
+  z-index: 10;
 }
 
 .header-left {
@@ -280,190 +267,62 @@ function getResultStatus(source: UniversalRule): { text: string; type: string } 
 }
 
 .page-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 500;
-}
-
-.header-center {
-  display: flex;
-  align-items: center;
 }
 
 .header-right {
   display: flex;
   align-items: center;
+  gap: 12px;
 }
 
 .test-stats {
   display: flex;
-  gap: 16px;
-  font-size: 14px;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.test-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--color-bg-3);
+  border: 1px solid var(--color-border);
+  font-weight: 500;
 }
 
 .stat-success {
   color: var(--color-success);
+  border-color: rgba(0, 180, 42, 0.3);
 }
 
 .stat-error {
-  color: var(--color-danger);
+  color: var(--color-error);
+  border-color: rgba(245, 63, 63, 0.35);
 }
 
-.stat-total {
-  color: var(--color-text-2);
-  font-weight: 500;
+.stat-running {
+  color: var(--color-primary);
+  border-color: rgba(22, 93, 255, 0.35);
+}
+
+.progress-bar {
+  flex-shrink: 0;
+  padding: 0 4px;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
 }
 
 .page-body {
   flex: 1;
   display: flex;
   min-height: 0;
-  overflow: hidden;
-}
-
-.source-list-panel {
-  width: 320px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--color-border);
-  background: var(--color-bg-2);
-}
-
-.panel-header {
-  flex-shrink: 0;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.source-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.source-item {
-  display: flex;
-  align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  margin-bottom: 4px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: var(--color-bg-3);
-}
-
-.source-item:hover {
-  background: var(--color-fill-2);
-}
-
-.source-item.selected {
-  background: rgba(22, 93, 255, 0.1);
-  border: 1px solid rgba(22, 93, 255, 0.3);
-}
-
-.source-item.status-running {
-  background: rgba(22, 93, 255, 0.08);
-}
-
-.source-item.status-success {
-  background: rgba(0, 180, 42, 0.08);
-}
-
-.source-item.status-error {
-  background: rgba(245, 63, 63, 0.08);
-}
-
-.source-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.source-name {
-  font-weight: 500;
-  font-size: 14px;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.source-host {
-  font-size: 12px;
-  color: var(--color-text-3);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.source-status {
-  font-size: 12px;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.source-status.success {
-  color: var(--color-success);
-}
-
-.source-status.error {
-  color: var(--color-danger);
-}
-
-.source-status.running {
-  color: var(--color-primary);
-}
-
-.source-status.pending {
-  color: var(--color-text-3);
-}
-
-.detail-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  padding: 16px;
-  background: var(--color-bg-1);
-}
-
-.detail-header {
-  flex-shrink: 0;
-  margin-bottom: 16px;
-}
-
-.detail-header h3 {
-  margin: 0 0 4px 0;
-  font-size: 18px;
-  font-weight: 500;
-}
-
-.detail-host {
-  font-size: 13px;
-  color: var(--color-text-3);
-}
-
-.detail-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  height: 200px;
-  color: var(--color-text-3);
-}
-
-.detail-content :deep(.result-display-tabs) {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
 }
 </style>

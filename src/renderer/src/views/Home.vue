@@ -3,14 +3,16 @@
   @description 书源调试器主界面，采用四栏布局
 -->
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   AddIcon,
   SaveIcon,
   DeleteIcon,
   FlashlightIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  ViewListIcon,
+  RefreshIcon
 } from 'tdesign-icons-vue-next'
 import { useSourceStore } from '../stores/sourceStore'
 import { useLogStore } from '../stores/logStore'
@@ -42,6 +44,26 @@ const leftPanelWidth = ref(DEFAULT_LEFT_WIDTH)
 const rightPanelWidth = ref(DEFAULT_RIGHT_WIDTH)
 const bottomPanelHeight = ref(DEFAULT_BOTTOM_HEIGHT)
 const bottomPanelCollapsed = ref(false)
+const showLogViewer = ref(false)
+const fileLogContent = ref('')
+const fileLogLoading = ref(false)
+type RendererBridge = Window & {
+  api?: {
+    readLog?: () => Promise<string>
+  }
+  electron?: {
+    ipcRenderer?: {
+      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
+    }
+  }
+}
+
+const canReadFileLog = computed(() => {
+  const w = window as RendererBridge
+  return (
+    typeof w.api?.readLog === 'function' || typeof w.electron?.ipcRenderer?.invoke === 'function'
+  )
+})
 
 const currentRule = ref<UniversalRule>(createDefaultUniversalRule())
 const hasChanges = ref(false)
@@ -174,6 +196,39 @@ function toggleBottomPanel(): void {
 function openBatchTest(): void {
   router.push('/batch-test')
 }
+
+async function openLogViewer(): Promise<void> {
+  showLogViewer.value = true
+  await loadFileLog()
+}
+
+async function loadFileLog(): Promise<void> {
+  try {
+    fileLogLoading.value = true
+    const w = window as RendererBridge
+    const apiRead = w.api?.readLog
+    const content =
+      typeof apiRead === 'function'
+        ? await apiRead()
+        : w.electron?.ipcRenderer?.invoke
+          ? await w.electron.ipcRenderer.invoke('log:read')
+          : ''
+    if (!content && !apiRead && !w.electron?.ipcRenderer?.invoke) {
+      fileLogContent.value = '当前环境不支持读取日志文件'
+      return
+    }
+    if (typeof content !== 'string') {
+      fileLogContent.value = String(content)
+      return
+    }
+    fileLogContent.value = content || '暂无日志内容'
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    fileLogContent.value = `读取日志失败: ${message}`
+  } finally {
+    fileLogLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -181,12 +236,12 @@ function openBatchTest(): void {
     <!-- 顶部工具栏 -->
     <div class="app-header">
       <div class="header-left">
-        <t-space size="small">
-          <t-button size="small" @click="handleCreateSource">
+        <t-space size="medium">
+          <t-button size="medium" @click="handleCreateSource">
             <template #icon><add-icon /></template>
             新建
           </t-button>
-          <t-button size="small" @click="handleSaveSource">
+          <t-button size="medium" @click="handleSaveSource">
             <template #icon><save-icon /></template>
             保存
           </t-button>
@@ -194,16 +249,25 @@ function openBatchTest(): void {
             content="确定要清除所有书源数据吗？此操作不可恢复！"
             @confirm="handleClearAll"
           >
-            <t-button size="small" theme="danger">
+            <t-button size="medium" theme="danger">
               <template #icon><delete-icon /></template>
               清除
             </t-button>
           </t-popconfirm>
         </t-space>
         <t-divider layout="vertical" style="margin: 0 12px" />
-        <t-button size="small" theme="primary" @click="openBatchTest">
+        <t-button size="medium" theme="primary" @click="openBatchTest">
           <template #icon><flashlight-icon /></template>
           批量测试
+        </t-button>
+        <t-button
+          size="medium"
+          variant="outline"
+          :disabled="!canReadFileLog"
+          @click="openLogViewer"
+        >
+          <template #icon><view-list-icon /></template>
+          查看日志
         </t-button>
       </div>
       <div class="header-right">
@@ -278,6 +342,26 @@ function openBatchTest(): void {
 
     <!-- 折叠状态的展开按钮 -->
     <div v-else class="log-collapsed" @click="toggleBottomPanel"><chevron-up-icon /> 显示日志</div>
+
+    <!-- 日志查看弹窗 -->
+    <t-dialog
+      v-model:visible="showLogViewer"
+      header="主进程日志（app-main.log）"
+      width="800px"
+      :footer="false"
+      destroy-on-close
+    >
+      <div class="file-log-actions">
+        <t-button size="small" variant="outline" :loading="fileLogLoading" @click="loadFileLog">
+          <template #icon><refresh-icon /></template>
+          刷新
+        </t-button>
+        <span class="file-log-hint">显示最近日志，路径位于 userData/logs</span>
+      </div>
+      <div class="file-log-viewer">
+        <pre>{{ fileLogContent }}</pre>
+      </div>
+    </t-dialog>
   </div>
 </template>
 
@@ -287,21 +371,31 @@ function openBatchTest(): void {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  gap: 12px;
+  padding: 12px 16px 16px;
+  box-sizing: border-box;
+  background: var(--color-bg-1);
 }
 
 .app-header {
   flex-shrink: 0;
   padding: 12px 16px;
   background: var(--color-bg-2);
-  border-bottom: 1px solid var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  z-index: 20;
+  flex-shrink: 0;
 }
 
 .header-left {
   display: flex;
   align-items: center;
+  gap: 12px;
 }
 
 .header-right {
@@ -310,14 +404,21 @@ function openBatchTest(): void {
 }
 
 .app-title {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .unsaved-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 146, 0, 0.1);
   color: var(--color-warning);
   font-size: 12px;
-  margin-left: 8px;
+  border: 1px solid rgba(255, 146, 0, 0.4);
 }
 
 .main-area {
@@ -325,12 +426,15 @@ function openBatchTest(): void {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  gap: 12px;
 }
 
 .left-panel {
   flex-shrink: 0;
-  background: var(--color-bg-1);
-  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -341,14 +445,19 @@ function openBatchTest(): void {
   min-width: 400px;
   overflow: hidden;
   background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
 }
 
 .right-panel {
   flex-shrink: 0;
-  background: var(--color-bg-1);
-  border-left: 1px solid var(--color-border);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -357,8 +466,10 @@ function openBatchTest(): void {
 .bottom-panel {
   flex-shrink: 0;
   width: 100%;
-  background: var(--color-bg-3);
-  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -366,19 +477,48 @@ function openBatchTest(): void {
 
 .log-collapsed {
   flex-shrink: 0;
-  padding: 8px 16px;
+  padding: 10px 14px;
   background: var(--color-bg-2);
-  border-top: 1px solid var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
   cursor: pointer;
   text-align: center;
-  font-size: 12px;
-  color: var(--color-text-3);
+  font-size: 13px;
+  color: var(--color-text-2);
   transition: all 0.2s;
   user-select: none;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
 }
 
 .log-collapsed:hover {
   background: var(--color-bg-3);
   color: var(--color-text-1);
+  transform: translateY(-1px);
+}
+
+.file-log-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.file-log-hint {
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.file-log-viewer {
+  max-height: 500px;
+  background: var(--color-bg-1);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  overflow: auto;
+  font-family: 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 </style>

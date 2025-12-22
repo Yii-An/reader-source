@@ -7,6 +7,9 @@ const api = {
   proxy: (url: string, userAgent?: string) => {
     return ipcRenderer.invoke('proxy:fetch', { url, userAgent })
   },
+  // 渲染进程日志写入主进程
+  log: (payload: { level: 'debug' | 'info' | 'warn' | 'error'; message: string; data?: unknown }) =>
+    ipcRenderer.invoke('log:write', payload),
   // HTML 解析
   parse: (
     html: string,
@@ -37,7 +40,9 @@ const api = {
   // 代理获取图片（绕过防盗链）
   proxyImage: (url: string, referer?: string) => {
     return ipcRenderer.invoke('proxy:image', { url, referer })
-  }
+  },
+  // 读取主进程日志
+  readLog: () => ipcRenderer.invoke('log:read')
 }
 
 if (process.contextIsolated) {
@@ -48,8 +53,8 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // @ts-ignore
+  // @ts-ignore Allow exposing electron API when contextIsolation is disabled
   window.electron = electronAPI
-  // @ts-ignore
+  // @ts-ignore Allow exposing custom api when contextIsolation is disabled
   window.api = api
 }

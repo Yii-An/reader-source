@@ -36,7 +36,7 @@ function handleSelect(item: { name: string; url: string }): void {
 
 <template>
   <div class="result-display-tabs">
-    <t-tabs v-model="activeTab" size="small">
+    <t-tabs v-model="activeTab" size="medium">
       <t-tab-panel value="visual" label="可视化">
         <BookResultList
           v-if="(type === 'search' || type === 'discover') && visualData.length > 0"
@@ -74,8 +74,6 @@ function handleSelect(item: { name: string; url: string }): void {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin-top: 16px;
-  padding-top: 16px;
   border-top: 1px solid var(--color-border);
 }
 

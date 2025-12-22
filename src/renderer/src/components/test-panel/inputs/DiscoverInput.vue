@@ -24,7 +24,7 @@ const emit = defineEmits<{
         <t-radio-group
           :value="selectedGroupIndex"
           variant="default-filled"
-          size="small"
+          size="medium"
           @change="(val: any) => emit('select-group', val as number)"
         >
           <t-radio-button v-for="(group, gIdx) in groups" :key="gIdx" :value="gIdx">
@@ -36,7 +36,7 @@ const emit = defineEmits<{
         <t-radio-group
           :value="selectedItemIndex"
           variant="default-filled"
-          size="small"
+          size="medium"
           @change="(val: any) => emit('select-item', val as number)"
         >
           <t-radio-button
@@ -52,7 +52,7 @@ const emit = defineEmits<{
 
     <t-button
       theme="primary"
-      size="small"
+      size="medium"
       :loading="loading || categoriesLoading"
       style="margin-top: 8px; width: 100%"
       @click="emit('test')"

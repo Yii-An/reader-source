@@ -23,7 +23,7 @@ const emit = defineEmits<{
 
     <t-button
       theme="primary"
-      size="small"
+      size="medium"
       :loading="loading"
       style="width: 100%"
       @click="emit('test')"

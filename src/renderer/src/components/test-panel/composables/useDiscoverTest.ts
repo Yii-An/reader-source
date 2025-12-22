@@ -33,7 +33,7 @@ export function useDiscoverTest(rule: Ref<UniversalRule>): {
   const results = ref<DiscoverResult[]>([])
   const categoriesLoading = ref(false)
 
-  const { buildFullUrl, parseContent, testing } = useTestLogic(rule.value)
+  const { buildFullUrl, parseContent, testing } = useTestLogic(() => rule.value)
 
   async function loadCategories(): Promise<void> {
     if (!rule.value.discover?.url) return

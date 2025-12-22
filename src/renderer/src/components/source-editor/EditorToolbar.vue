@@ -1,8 +1,6 @@
 <script setup lang="ts">
 defineProps<{
   mode: 'code' | 'form'
-  ruleName: string
-  ruleHost: string
   sourceFormat?: string
 }>()
 
@@ -16,15 +14,14 @@ const emit = defineEmits<{
     <t-radio-group
       :value="mode"
       variant="default-filled"
-      size="small"
+      size="medium"
       @change="emit('update:mode', $event as 'code' | 'form')"
     >
       <t-radio-button value="code">代码</t-radio-button>
       <t-radio-button value="form">表单</t-radio-button>
     </t-radio-group>
     <span class="editor-info">
-      {{ ruleName }} - {{ ruleHost || '未设置' }}
-      <t-tag v-if="sourceFormat" size="small" theme="primary">
+      <t-tag v-if="sourceFormat" size="medium" theme="primary">
         {{ sourceFormat }}
       </t-tag>
     </span>

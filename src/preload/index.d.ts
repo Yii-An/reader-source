@@ -9,13 +9,13 @@ interface ProxyResult {
 
 interface ParseResult {
   success: boolean
-  data?: any[]
+  data?: unknown[]
   error?: string
 }
 
 interface ExecuteJsResult {
   success: boolean
-  data?: any
+  data?: unknown
   error?: string
 }
 

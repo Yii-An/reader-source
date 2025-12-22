@@ -24,11 +24,11 @@ function formatTime(timestamp: number): string {
   <div class="log-panel-container">
     <div class="log-header">
       <span class="log-title">调试日志</span>
-      <t-space size="small">
-        <t-button size="small" variant="text" @click="emit('clear')">
+      <t-space size="medium">
+        <t-button size="medium" variant="text" @click="emit('clear')">
           <template #icon><delete-icon /></template>
         </t-button>
-        <t-button size="small" variant="text" @click="emit('collapse')">
+        <t-button size="medium" variant="text" @click="emit('collapse')">
           <template #icon><chevron-down-icon /></template>
         </t-button>
       </t-space>

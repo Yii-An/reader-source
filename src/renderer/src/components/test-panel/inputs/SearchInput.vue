@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { SearchIcon } from 'tdesign-icons-vue-next'
-
 defineProps<{
   keyword: string
   loading: boolean
@@ -20,18 +18,11 @@ const emit = defineEmits<{
       @change="emit('update:keyword', $event as string)"
       @enter="emit('test')"
     >
-      <template #suffix-icon>
-        <search-icon />
-      </template>
       <template #suffix>
-        <t-button size="small" :loading="loading" @click="emit('test')">测试</t-button>
+        <t-button size="medium" :loading="loading" @click="emit('test')">搜索</t-button>
       </template>
     </t-input>
   </div>
 </template>
 
-<style scoped>
-.search-input {
-  margin-bottom: 8px;
-}
-</style>
+<style scoped></style>

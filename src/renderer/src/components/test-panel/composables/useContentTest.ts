@@ -14,7 +14,7 @@ export function useContentTest(rule: Ref<UniversalRule>): {
   const url = ref('')
   const content = ref<string[]>([])
 
-  const { buildFullUrl, fetchHtml, testing, rawHtml } = useTestLogic(rule.value)
+  const { buildFullUrl, fetchHtml, testing, rawHtml } = useTestLogic(() => rule.value)
 
   const isManga = computed(() => rule.value.contentType === UniversalContentType.MANGA)
 

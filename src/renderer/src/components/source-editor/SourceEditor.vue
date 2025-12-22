@@ -139,8 +139,6 @@ function handleContentUpdate(rule: UniversalContentRule): void {
   <div class="editor-container">
     <EditorToolbar
       :mode="editorMode"
-      :rule-name="localRule.name"
-      :rule-host="localRule.host || ''"
       :source-format="localRule._meta?.sourceFormat"
       @update:mode="editorMode = $event"
     />

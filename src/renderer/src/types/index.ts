@@ -5,6 +5,9 @@
 // 导出规则类型
 export * from './universal'
 
+// 导出批量测试类型
+export * from './batch-test'
+
 /**
  * 日志级别
  */

@@ -12,8 +12,9 @@ export interface ParseResult {
 
 /**
  * 测试逻辑通用功能
+ * @param getRule getter 函数，每次调用返回最新的规则配置（确保 userAgent 等配置的修改能即时生效）
  */
-export function useTestLogic(rule: UniversalRule): {
+export function useTestLogic(getRule: () => UniversalRule): {
   testing: Ref<boolean>
   rawHtml: Ref<string>
   buildFullUrl: (url: string, host: string) => string
@@ -43,6 +44,7 @@ export function useTestLogic(rule: UniversalRule): {
    * 获取 HTML 内容
    */
   async function fetchHtml(url: string): Promise<string> {
+    const rule = getRule()
     const proxyResult = await window.api.proxy(url, rule.userAgent)
     if (!proxyResult.success) {
       throw new Error(proxyResult.error || '代理请求失败')
@@ -65,6 +67,7 @@ export function useTestLogic(rule: UniversalRule): {
     fields: Record<string, string>,
     nextUrlRule?: string
   ): Promise<ParseResult> {
+    const rule = getRule()
     const isXPath = listRule.startsWith('//') || listRule.startsWith('/')
     const ruleType = isXPath ? 'XPath' : 'CSS'
 

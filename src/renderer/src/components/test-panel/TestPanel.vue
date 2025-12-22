@@ -263,7 +263,7 @@ const currentPage = computed(() => {
 /**
  * 上一页
  */
-async function handlePrevPage() {
+async function handlePrevPage(): Promise<void> {
   if (testing.value) return
   testing.value = true
   try {
@@ -292,7 +292,7 @@ async function handlePrevPage() {
 /**
  * 下一页
  */
-async function handleNextPage() {
+async function handleNextPage(): Promise<void> {
   if (testing.value) return
   testing.value = true
   try {
@@ -336,7 +336,7 @@ watch(
  * 使用测试逻辑 Composable
  * @description 提供 URL 构建、HTML 获取、内容解析等通用功能
  */
-const { buildFullUrl, fetchHtml, parseContent } = useTestLogic(props.rule)
+const { buildFullUrl, fetchHtml, parseContent } = useTestLogic(() => props.rule)
 
 // ==================== 数据清理函数 ====================
 
@@ -941,7 +941,7 @@ function selectResult(item: { name: string; url: string }): void {
   <div class="test-panel-container">
     <!-- Header -->
     <div class="test-header">
-      <t-radio-group v-model="testType" variant="default-filled" size="small">
+      <t-radio-group v-model="testType" variant="default-filled" size="medium">
         <t-radio-button value="search">搜索</t-radio-button>
         <t-radio-button value="discover">发现</t-radio-button>
         <t-radio-button value="chapter">章节</t-radio-button>
@@ -979,12 +979,7 @@ function selectResult(item: { name: string; url: string }): void {
           :loading="testing"
           @test="runTest"
         />
-        <ContentInput
-          v-else
-          v-model:url="contentUrl"
-          :loading="testing"
-          @test="runTest"
-        />
+        <ContentInput v-else v-model:url="contentUrl" :loading="testing" @test="runTest" />
       </div>
 
       <!-- Results -->
@@ -999,7 +994,7 @@ function selectResult(item: { name: string; url: string }): void {
       />
 
       <!-- Floating Pagination -->
-      <div v-if="currentHasPagination" class="floating-pagination">
+      <div v-if="currentHasPagination && hasResults" class="floating-pagination">
         <t-button
           variant="text"
           shape="circle"
@@ -1009,12 +1004,7 @@ function selectResult(item: { name: string; url: string }): void {
           <template #icon><chevron-left-icon /></template>
         </t-button>
         <span class="page-indicator">{{ currentPage }}</span>
-        <t-button
-          variant="text"
-          shape="circle"
-          :disabled="testing"
-          @click="handleNextPage"
-        >
+        <t-button variant="text" shape="circle" :disabled="testing" @click="handleNextPage">
           <template #icon><chevron-right-icon /></template>
         </t-button>
       </div>
@@ -1149,6 +1139,6 @@ function selectResult(item: { name: string; url: string }): void {
   min-width: 32px;
   text-align: center;
   user-select: none;
-  font-feature-settings: "tnum";
+  font-feature-settings: 'tnum';
 }
 </style>

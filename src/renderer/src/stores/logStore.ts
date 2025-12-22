@@ -21,6 +21,17 @@ const MAX_LOGS = 1000
 /** 清理后保留的日志数 */
 const TRIM_TO = 500
 
+function sendToMain(level: LogLevel, message: string, data?: unknown): void {
+  try {
+    if (typeof window === 'undefined') return
+    const api = (window as Window).api
+    if (!api?.log) return
+    api.log({ level, message, data, scope: 'renderer' }).catch(() => {})
+  } catch {
+    // 忽略跨进程写入失败，避免影响前端日志展示
+  }
+}
+
 export const useLogStore = defineStore('log', () => {
   // ============================================================
   // 响应式状态
@@ -85,6 +96,7 @@ export const useLogStore = defineStore('log', () => {
       message,
       data
     })
+    sendToMain(level, message, data)
     // 自动清理过多的日志
     if (logs.value.length > MAX_LOGS) {
       logs.value = logs.value.slice(0, TRIM_TO)

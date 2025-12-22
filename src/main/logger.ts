@@ -7,20 +7,45 @@ import * as path from 'path'
 /** 日志目录路径 */
 const LOG_DIR = path.join(app.getPath('userData'), 'logs')
 
-/** 主日志文件路径 */
-const LOG_FILE = path.join(LOG_DIR, 'app.log')
+/** 日志文件前缀 */
+const LOG_FILE_BASENAME = 'app-main.log'
 
-/** 单个日志文件最大大小 (2MB) */
-const MAX_LOG_SIZE = 2 * 1024 * 1024
+/** 主进程日志文件路径 */
+const LOG_FILE = path.join(LOG_DIR, LOG_FILE_BASENAME)
 
-/** 保留的旧日志文件数量 */
-const MAX_LOG_FILES = 3
+/** 日志级别 */
+type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
 
-/** 日志文件最大保留天数 */
-const MAX_LOG_AGE_DAYS = 7
+/** 级别优先级 */
+const LEVEL_PRIORITY: Record<LogLevel, number> = {
+  DEBUG: 10,
+  INFO: 20,
+  WARN: 30,
+  ERROR: 40
+}
 
-/** 轮转检查间隔（每 N 次写入检查一次文件大小） */
-const ROTATION_CHECK_INTERVAL = 100
+/** 当前生效的日志级别（可通过环境变量 LOG_LEVEL 覆盖） */
+const CURRENT_LEVEL: LogLevel =
+  (process.env.LOG_LEVEL?.toUpperCase() as LogLevel) || (app.isPackaged ? 'INFO' : 'DEBUG')
+
+function envNumber(name: string, fallback: number): number {
+  const raw = process.env[name]
+  if (!raw) return fallback
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+/** 单个日志文件最大大小 (默认 5MB，可用 LOG_MAX_SIZE_BYTES 覆盖) */
+const MAX_LOG_SIZE = envNumber('LOG_MAX_SIZE_BYTES', 5 * 1024 * 1024)
+
+/** 保留的旧日志文件数量 (默认 5，可用 LOG_MAX_FILES 覆盖) */
+const MAX_LOG_FILES = envNumber('LOG_MAX_FILES', 5)
+
+/** 日志文件最大保留天数 (默认 14，可用 LOG_MAX_AGE_DAYS 覆盖) */
+const MAX_LOG_AGE_DAYS = envNumber('LOG_MAX_AGE_DAYS', 14)
+
+/** 轮转检查间隔（每 N 次写入检查一次，默认 20，可用 LOG_ROTATE_INTERVAL 覆盖） */
+const ROTATION_CHECK_INTERVAL = envNumber('LOG_ROTATE_INTERVAL', 20)
 
 // ==================== 运行时状态 ====================
 
@@ -54,7 +79,7 @@ function cleanupOldLogs(): void {
     const maxAge = MAX_LOG_AGE_DAYS * 24 * 60 * 60 * 1000
 
     for (const file of files) {
-      if (!file.startsWith('app.log')) continue
+      if (!file.startsWith(LOG_FILE_BASENAME)) continue
 
       const filePath = path.join(LOG_DIR, file)
       try {
@@ -152,7 +177,7 @@ function formatTimestamp(): string {
  * @param level - 日志级别
  * @param args - 日志内容
  */
-function writeToFile(level: string, ...args: unknown[]): void {
+function writeToFile(level: LogLevel, ...args: unknown[]): void {
   try {
     initializeIfNeeded()
     checkRotation()
@@ -170,7 +195,7 @@ function writeToFile(level: string, ...args: unknown[]): void {
       })
       .join(' ')
 
-    const logLine = `[${timestamp}] [${level}] ${message}\n`
+    const logLine = `[${timestamp}] [${level}] [main] ${message}\n`
 
     fs.appendFileSync(LOG_FILE, logLine, { encoding: 'utf8' })
   } catch {
@@ -193,23 +218,23 @@ const originalConsole = {
 export const logger = {
   log: (...args: unknown[]): void => {
     originalConsole.log(...args)
-    writeToFile('INFO', ...args)
+    if (LEVEL_PRIORITY.INFO >= LEVEL_PRIORITY[CURRENT_LEVEL]) writeToFile('INFO', ...args)
   },
   error: (...args: unknown[]): void => {
     originalConsole.error(...args)
-    writeToFile('ERROR', ...args)
+    if (LEVEL_PRIORITY.ERROR >= LEVEL_PRIORITY[CURRENT_LEVEL]) writeToFile('ERROR', ...args)
   },
   warn: (...args: unknown[]): void => {
     originalConsole.warn(...args)
-    writeToFile('WARN', ...args)
+    if (LEVEL_PRIORITY.WARN >= LEVEL_PRIORITY[CURRENT_LEVEL]) writeToFile('WARN', ...args)
   },
   info: (...args: unknown[]): void => {
     originalConsole.info(...args)
-    writeToFile('INFO', ...args)
+    if (LEVEL_PRIORITY.INFO >= LEVEL_PRIORITY[CURRENT_LEVEL]) writeToFile('INFO', ...args)
   },
   debug: (...args: unknown[]): void => {
     originalConsole.debug(...args)
-    writeToFile('DEBUG', ...args)
+    if (LEVEL_PRIORITY.DEBUG >= LEVEL_PRIORITY[CURRENT_LEVEL]) writeToFile('DEBUG', ...args)
   }
 }
 
@@ -247,4 +272,50 @@ export function getLogDir(): string {
 export function cleanupLogs(): void {
   cleanupOldLogs()
   rotateLogFile()
+}
+
+/**
+ * 读取主进程日志的末尾内容
+ * @param maxLines 最大返回行数
+ */
+export function readRecentLogs(maxLines = 400): string {
+  try {
+    if (!fs.existsSync(LOG_FILE)) return ''
+    const content = fs.readFileSync(LOG_FILE, 'utf8')
+    const lines = content.split(/\r?\n/)
+    const sliced = lines.slice(Math.max(0, lines.length - maxLines))
+    return sliced.join('\n')
+  } catch {
+    return ''
+  }
+}
+
+// ==================== 供渲染进程调用的桥接 ====================
+
+/**
+ * 接收渲染进程日志并写入主进程文件
+ * @param payload 渲染进程上报的日志
+ */
+export function writeRendererLog(payload: {
+  level: 'debug' | 'info' | 'warn' | 'error'
+  message: string
+  scope?: string
+  data?: unknown
+}): void {
+  const level = payload.level.toUpperCase() as LogLevel
+  if (LEVEL_PRIORITY[level] < LEVEL_PRIORITY[CURRENT_LEVEL]) return
+  const parts = [payload.message]
+  if (payload.scope) parts.unshift(`[${payload.scope}]`)
+  if (payload.data !== undefined) {
+    parts.push(
+      (() => {
+        try {
+          return JSON.stringify(payload.data)
+        } catch {
+          return String(payload.data)
+        }
+      })()
+    )
+  }
+  writeToFile(level, ...parts)
 }

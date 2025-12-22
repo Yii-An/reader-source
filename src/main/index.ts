@@ -13,7 +13,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerProxyHandlers, closeBrowser } from './proxy'
-import { redirectConsoleToLogger, getLogFilePath } from './logger'
+import { redirectConsoleToLogger, getLogFilePath, writeRendererLog, readRecentLogs } from './logger'
 
 // ==================== 日志系统初始化 ====================
 // 将 console 输出重定向到日志文件，便于调试和问题排查
@@ -89,6 +89,13 @@ app.whenReady().then(() => {
   // 注册 IPC 处理器
   ipcMain.on('ping', () => console.log('pong')) // 简单的连通性测试
   registerProxyHandlers() // 注册代理服务相关的 IPC 处理器（proxy:fetch, proxy:parse 等）
+  ipcMain.handle('log:write', (_, payload) => {
+    if (!payload || typeof payload.message !== 'string' || typeof payload.level !== 'string') return
+    writeRendererLog(payload)
+  })
+  ipcMain.handle('log:read', () => {
+    return readRecentLogs()
+  })
 
   createWindow()
 
